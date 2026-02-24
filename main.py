@@ -2,17 +2,28 @@
 OpenEMR AI Agent microservice - Patient and Staff APIs per PRD.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.patient import router as patient_router
 from app.api.staff import router as staff_router
+from app.langfuse_client import flush_langfuse
 from app.telemetry import setup_telemetry
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    flush_langfuse()
+
 
 app = FastAPI(
     title="OpenEMR AI Agent",
     description="Generative AI Agent for patient and staff support per PRD",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

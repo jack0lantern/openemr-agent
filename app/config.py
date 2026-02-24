@@ -11,8 +11,20 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     escalation_phone: str = "555-0199"
 
+    # When False, patient chat allows unauthenticated access (for dev until auth is ready).
+    # Set to True when OAuth/patient auth is configured.
+    patient_auth_required: bool = True
+
     # Telemetry (PRD §6.2) - OTLP endpoint for Datadog/CloudWatch. Empty = console exporter.
     otel_exporter_otlp_endpoint: str = ""
+
+    # Langfuse observability - optional. Set keys to enable traces in Langfuse dashboard.
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+
+    # Demo: include tool calls in chat response for UI debug box. Set to True to enable.
+    debug_tool_calls: bool = False
 
 
 settings = Settings()

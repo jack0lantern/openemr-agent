@@ -71,10 +71,10 @@ async def staff_chat(
                     f"{settings.escalation_phone} or escalate to a human staff member."
                 )
             history = _build_history(body.messages)
-            response = await asyncio.to_thread(
+            message, tool_calls = await asyncio.to_thread(
                 invoke_staff_agent, user_input, history=history if history else None
             )
-            return ChatResponse(message=response)
+            return ChatResponse(message=message, tool_calls=tool_calls)
         except Exception as e:
             span.record_exception(e)
             return ChatResponse(

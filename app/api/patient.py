@@ -41,10 +41,11 @@ async def patient_chat(
     token: str | None = Depends(_get_patient_token),
 ) -> ChatResponse:
     """
-    Patient-facing chat endpoint. Requires OAuth token tied to the authenticated patient.
+    Patient-facing chat endpoint. When patient_auth_required=True, requires OAuth token
+    tied to the authenticated patient. When False, allows unauthenticated access.
     Supports: appointment info, clinic info, booking/modify/cancel, non-diagnostic medical info.
     """
-    if not token:
+    if settings.patient_auth_required and not token:
         raise HTTPException(
             status_code=401,
             detail="Authorization required. OAuth token tied to the authenticated patient is required.",
@@ -71,10 +72,10 @@ async def patient_chat(
                     f"{settings.escalation_phone} for assistance."
                 )
             history = _build_history(body.messages)
-            response = await asyncio.to_thread(
+            message, tool_calls = await asyncio.to_thread(
                 invoke_patient_agent, user_input, history=history if history else None
             )
-            return ChatResponse(message=response)
+            return ChatResponse(message=message, tool_calls=tool_calls)
         except Exception as e:
             span.record_exception(e)
             return ChatResponse(

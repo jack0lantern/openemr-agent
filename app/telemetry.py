@@ -3,6 +3,9 @@ OpenTelemetry setup for OpenEMR Agent per PRD §6.2.
 
 Traces are compatible with Datadog, CloudWatch, and other OTLP backends.
 Set OTEL_EXPORTER_OTLP_ENDPOINT for production (e.g., Datadog agent).
+
+LangGraph/LangChain instrumentation via OpenInference captures LLM calls,
+tool invocations, and agent workflow spans (OpenInference semantic conventions).
 """
 
 import logging
@@ -46,11 +49,24 @@ def setup_telemetry(app: Any) -> None:
     provider.add_span_processor(_create_span_processor())
     trace.set_tracer_provider(provider)
 
+    # Instrument LangGraph/LangChain when openinference-instrumentation-langchain is installed
+    try:
+        from openinference.instrumentation.langchain import LangChainInstrumentor
+
+        LangChainInstrumentor().instrument()
+        langgraph_instrumented = True
+    except ImportError:
+        langgraph_instrumented = False
+
     FastAPIInstrumentor.instrument_app(
         app,
         excluded_urls="health,/,/health",
     )
-    logger.info("Telemetry initialized (OTLP endpoint: %s)", settings.otel_exporter_otlp_endpoint or "console")
+    logger.info(
+        "Telemetry initialized (OTLP endpoint: %s, LangGraph instrumented: %s)",
+        settings.otel_exporter_otlp_endpoint or "console",
+        langgraph_instrumented,
+    )
 
 
 def get_tracer() -> trace.Tracer:
