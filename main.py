@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.patient import router as patient_router
 from app.api.staff import router as staff_router
+from app.telemetry import setup_telemetry
 
 app = FastAPI(
     title="OpenEMR AI Agent",
@@ -24,6 +25,9 @@ app.add_middleware(
 
 app.include_router(patient_router)
 app.include_router(staff_router)
+
+# Setup OpenTelemetry (PRD §6.2 - Datadog/CloudWatch compatible)
+setup_telemetry(app)
 
 
 @app.get("/health")

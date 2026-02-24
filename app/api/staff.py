@@ -5,11 +5,15 @@ Use cases: scheduling, insurance verification, clinical workflows, medication or
 bloodwork review for triage. Administrative Worker tools for phpGACL and scheduling services.
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
+from app.llm.agent import invoke_staff_agent
 from app.schemas import ChatRequest, ChatResponse
+from app.telemetry import get_tracer
 
 router = APIRouter(prefix="/api/chat", tags=["staff"])
 security = HTTPBearer(auto_error=False)
@@ -20,6 +24,14 @@ def _get_staff_token(credentials: HTTPAuthorizationCredentials | None = Depends(
     if credentials is None:
         return None
     return credentials.credentials
+
+
+def _build_history(messages: list) -> list[tuple[str, str]]:
+    """Convert chat messages to (role, content) history, excluding the last user message."""
+    history: list[tuple[str, str]] = []
+    for m in messages[:-1]:
+        history.append((m.role, m.content))
+    return history
 
 
 @router.post("/staff", response_model=ChatResponse)
@@ -42,26 +54,29 @@ async def staff_chat(
     if last_message.role != "user":
         raise HTTPException(status_code=400, detail="Invalid request: expected user message")
 
-    # Placeholder: In production, validate token with OpenEMR, verify staff role via phpGACL,
-    # and invoke LangGraph orchestrator with Clinical + Administrative workers
     user_input = last_message.content.strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
 
-    # Degrade gracefully per PRD §5.2: on failure, include escalation number
-    try:
-        # TODO: Wire to LangGraph orchestrator with:
-        # - Clinical Worker: FHIR read, patient history summary
-        # - Administrative Worker: phpGACL, scheduling, insurance (EDI 270/271),
-        #   medication order drafts (staged for provider sign-off), bloodwork review
-        response = (
-            f"I'm your staff assistant. You asked: \"{user_input}\"\n\n"
-            "I can help with scheduling, insurance verification, medication order drafts, "
-            "bloodwork review for triage, and other administrative tasks. "
-            "Full agent integration with OpenEMR is coming soon."
-        )
-        return ChatResponse(message=response)
-    except Exception:
-        return ChatResponse(
-            message=f"Sorry, I couldn't process your request. Please call IT support at {settings.escalation_phone} or escalate to a human staff member."
-        )
+    tracer = get_tracer()
+    with tracer.start_as_current_span("staff_chat.invoke_agent") as span:
+        span.set_attribute("agent.type", "staff")
+        span.set_attribute("message.length", len(user_input))
+
+        try:
+            if not settings.anthropic_api_key:
+                return ChatResponse(
+                    message=f"I'm your staff assistant. You asked: \"{user_input}\"\n\n"
+                    "LLM integration requires ANTHROPIC_API_KEY. Please call IT support at "
+                    f"{settings.escalation_phone} or escalate to a human staff member."
+                )
+            history = _build_history(body.messages)
+            response = await asyncio.to_thread(
+                invoke_staff_agent, user_input, history=history if history else None
+            )
+            return ChatResponse(message=response)
+        except Exception as e:
+            span.record_exception(e)
+            return ChatResponse(
+                message=f"Sorry, I couldn't process your request. Please call IT support at {settings.escalation_phone} or escalate to a human staff member."
+            )

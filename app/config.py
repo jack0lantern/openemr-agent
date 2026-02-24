@@ -11,5 +11,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     escalation_phone: str = "555-0199"
 
+    # Telemetry (PRD §6.2) - OTLP endpoint for Datadog/CloudWatch. Empty = console exporter.
+    otel_exporter_otlp_endpoint: str = ""
+
 
 settings = Settings()

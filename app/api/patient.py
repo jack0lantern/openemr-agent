@@ -6,11 +6,15 @@ medical condition info (non-recommendation). OAuth token must be tied specifical
 to the authenticated patient (no "God Mode" API key).
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
+from app.llm.agent import invoke_patient_agent
 from app.schemas import ChatRequest, ChatResponse
+from app.telemetry import get_tracer
 
 router = APIRouter(prefix="/api/chat", tags=["patient"])
 security = HTTPBearer(auto_error=False)
@@ -21,6 +25,14 @@ def _get_patient_token(credentials: HTTPAuthorizationCredentials | None = Depend
     if credentials is None:
         return None
     return credentials.credentials
+
+
+def _build_history(messages: list) -> list[tuple[str, str]]:
+    """Convert chat messages to (role, content) history, excluding the last user message."""
+    history: list[tuple[str, str]] = []
+    for m in messages[:-1]:
+        history.append((m.role, m.content))
+    return history
 
 
 @router.post("/patient", response_model=ChatResponse)
@@ -42,26 +54,29 @@ async def patient_chat(
     if last_message.role != "user":
         raise HTTPException(status_code=400, detail="Invalid request: expected user message")
 
-    # Placeholder: In production, validate token with OpenEMR, extract patient_id,
-    # and invoke LangGraph agent with patient-scoped tools (appointments, clinic info, etc.)
     user_input = last_message.content.strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
 
-    # Degrade gracefully per PRD §5.2: on failure, include escalation number
-    try:
-        # TODO: Wire to LangGraph patient agent with tools:
-        # - get_clinic_info, get_appointment_locations
-        # - book_appointment, modify_appointment, cancel_appointment (patient's own only)
-        # - get_medical_info_non_recommendation (grounded in verified sources)
-        response = (
-            f"I'm your patient assistant. You asked: \"{user_input}\"\n\n"
-            "I can help with appointment locations, clinic info, booking or changing appointments, "
-            "and general health information (non-diagnostic). "
-            "Full agent integration with OpenEMR FHIR is coming soon."
-        )
-        return ChatResponse(message=response)
-    except Exception:
-        return ChatResponse(
-            message=f"Sorry, I couldn't process your request. Please call the front desk at {settings.escalation_phone} for assistance."
-        )
+    tracer = get_tracer()
+    with tracer.start_as_current_span("patient_chat.invoke_agent") as span:
+        span.set_attribute("agent.type", "patient")
+        span.set_attribute("message.length", len(user_input))
+
+        try:
+            if not settings.anthropic_api_key:
+                return ChatResponse(
+                    message=f"I'm your patient assistant. You asked: \"{user_input}\"\n\n"
+                    "LLM integration requires ANTHROPIC_API_KEY. Please call the front desk at "
+                    f"{settings.escalation_phone} for assistance."
+                )
+            history = _build_history(body.messages)
+            response = await asyncio.to_thread(
+                invoke_patient_agent, user_input, history=history if history else None
+            )
+            return ChatResponse(message=response)
+        except Exception as e:
+            span.record_exception(e)
+            return ChatResponse(
+                message=f"Sorry, I couldn't process your request. Please call the front desk at {settings.escalation_phone} for assistance."
+            )
