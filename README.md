@@ -50,8 +50,9 @@ pip install -r requirements-dev.txt
 pytest tests/test_tools.py tests/test_api.py -v
 
 # Full golden path including agent integration (requires ANTHROPIC_API_KEY)
-ANTHROPIC_API_KEY=sk-... pytest tests/ -v --timeout=60
+# Add ANTHROPIC_API_KEY to .env or export it; conftest loads .env automatically
+pytest tests/ -v --timeout=60
 
 # Safety tests only
-ANTHROPIC_API_KEY=sk-... pytest tests/test_safety.py -v --timeout=60
+pytest tests/test_safety.py -v --timeout=60
 ```

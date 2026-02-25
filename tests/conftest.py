@@ -8,11 +8,14 @@ settings overrides for integration and API tests.
 import os
 
 import pytest
+from dotenv import load_dotenv
 
-# Skip integration tests if no API key
+load_dotenv()  # Load .env so ANTHROPIC_API_KEY is available for integration tests
+
+# Skip integration tests if no API key (from .env or environment)
 requires_api_key = pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set — skipping integration tests",
+    reason="ANTHROPIC_API_KEY not set — skipping integration tests (add to .env)",
 )
 
 
