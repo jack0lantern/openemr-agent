@@ -361,7 +361,7 @@ class MessagesState(TypedDict):
 def _get_model():
     """Claude Sonnet per PRD §4.2. Requires ANTHROPIC_API_KEY."""
     return ChatAnthropic(
-        model="claude-sonnet-4-5-20250929",
+        model="claude-haiku-4-5",
         temperature=0,
         api_key=settings.anthropic_api_key or None,
     )
