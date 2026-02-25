@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Set to True when OAuth/patient auth is configured.
     patient_auth_required: bool = True
 
+    # When False, staff chat allows unauthenticated access (for dev until auth is ready).
+    # Set to True when OAuth/staff auth is configured.
+    staff_auth_required: bool = True
+
     # Telemetry (PRD §6.2) - OTLP endpoint for Datadog/CloudWatch. Empty = console exporter.
     otel_exporter_otlp_endpoint: str = ""
 

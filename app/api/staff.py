@@ -40,11 +40,12 @@ async def staff_chat(
     token: str | None = Depends(_get_staff_token),
 ) -> ChatResponse:
     """
-    Staff-facing chat endpoint. Requires OAuth token with staff/admin scope.
+    Staff-facing chat endpoint. When staff_auth_required=True, requires OAuth token
+    with staff/admin scope. When False, allows unauthenticated access.
     Supports: scheduling, insurance verification, medication order drafts,
     bloodwork review for triage, phpGACL and administrative tools.
     """
-    if not token:
+    if settings.staff_auth_required and not token:
         raise HTTPException(
             status_code=401,
             detail="Authorization required. OAuth token with staff scope is required.",
