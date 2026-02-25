@@ -52,6 +52,9 @@ pytest tests/test_tools.py tests/test_api.py -v
 # Core golden path (13 critical integration tests; requires ANTHROPIC_API_KEY)
 pytest tests/test_agent_golden_path.py -v --timeout=60
 
+# Only eval tests
+pytest tests/test_agent_eval.py -v --timeout=60
+
 # Full suite including extended eval tests
 pytest tests/ -v --timeout=60
 
