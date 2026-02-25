@@ -49,8 +49,10 @@ pip install -r requirements-dev.txt
 # Unit tests only (no API key needed)
 pytest tests/test_tools.py tests/test_api.py -v
 
-# Full golden path including agent integration (requires ANTHROPIC_API_KEY)
-# Add ANTHROPIC_API_KEY to .env or export it; conftest loads .env automatically
+# Core golden path (13 critical integration tests; requires ANTHROPIC_API_KEY)
+pytest tests/test_agent_golden_path.py -v --timeout=60
+
+# Full suite including extended eval tests
 pytest tests/ -v --timeout=60
 
 # Safety tests only

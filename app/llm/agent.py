@@ -75,7 +75,7 @@ def get_clinic_info(query: str) -> str:
 
 @tool
 def get_appointment_availability(date: str) -> str:
-    """Check appointment availability for a given date. Use YYYY-MM-DD format (e.g. 2025-02-25)."""
+    """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') and pass YYYY-MM-DD format (e.g. 2025-02-25)."""
     slots = [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date]
     available_dates = sorted({s["date"] for s in MOCK_AVAILABLE_SLOTS})
     if not slots:
@@ -373,6 +373,7 @@ PATIENT_SYSTEM_PROMPT = """You are a patient assistant for a healthcare clinic. 
 
 You help with:
 - Appointment locations, clinic hours, and contact info
+- Checking availability (openings, slots) — always use get_appointment_availability; infer dates from phrases like "next Friday" or "tomorrow"
 - Booking, modifying, or canceling appointments (patient's own only)
 - General health information (non-recommendation, educational only)
 
