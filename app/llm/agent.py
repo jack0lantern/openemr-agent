@@ -25,10 +25,10 @@ from app.data.mock_data import (
     MOCK_APPOINTMENTS,
     MOCK_AVAILABLE_SLOTS,
     MOCK_INSURANCE_PLANS,
+    MOCK_MEDICAL_CONDITIONS,
     MOCK_PATIENTS,
     MOCK_PROVIDERS,
 )
-from app.langfuse_client import get_invoke_config
 
 
 # --- Tools (mock data for demo; wire to OpenEMR FHIR / phpGACL in production) ---
@@ -220,11 +220,36 @@ def book_appointment(patient_id: str, slot_id: str) -> str:
 
 
 @tool
-def get_medical_info_non_recommendation(topic: str) -> str:
-    """Get general medical information (non-diagnostic, non-recommendation). Grounded in verified sources only."""
+def search_medical_info(symptoms: str) -> str:
+    """Search for possible conditions associated with given symptoms. Returns educational information only—never diagnoses or recommends treatments. Use when a patient asks about symptoms, 'what could cause X', or 'conditions related to Y'. Input: symptom keywords (e.g. 'headache nausea', 'cough fever', 'stomach pain')."""
+    query = (symptoms or "").lower().strip()
+    if not query:
+        return _tool_result({
+            "conditions": [],
+            "query": symptoms,
+            "disclaimer": "This is educational information only. It does not constitute medical advice, diagnosis, or treatment. Always consult your healthcare provider for personal medical guidance.",
+            "message": "Please provide symptom keywords to search (e.g. headache, cough, stomach pain).",
+        })
+    # Match conditions where any common_symptom contains any query term
+    query_terms = [t for t in query.split() if len(t) >= 2]
+    matches = []
+    for cond in MOCK_MEDICAL_CONDITIONS:
+        symptom_text = " ".join(cond["common_symptoms"]).lower()
+        cond_name_lower = cond["name"].lower()
+        if any(
+            term in symptom_text or term in cond_name_lower
+            for term in query_terms
+        ):
+            matches.append({
+                "name": cond["name"],
+                "description": cond["description"],
+                "common_symptoms": cond["common_symptoms"],
+            })
     return _tool_result({
-        "topic": topic,
-        "disclaimer": "Educational purposes only. Always consult your provider for personal medical advice. I cannot diagnose or recommend treatments.",
+        "conditions": matches,
+        "query": symptoms,
+        "disclaimer": "This is educational information only. It does not constitute medical advice, diagnosis, or treatment. Always consult your healthcare provider for personal medical guidance.",
+        "message": f"Found {len(matches)} possible condition(s) associated with '{symptoms}'." if matches else f"No matching conditions found for '{symptoms}'. Consider rephrasing or consulting your provider.",
     })
 
 
@@ -280,8 +305,8 @@ def lookup_patient_summary(patient_id: str) -> str:
 
 @tool
 def verify_insurance(member_id: str) -> str:
-    """Verify insurance coverage. Staff only. Use member ID (e.g. MEM-987654321, AET-MEM-555123, UHC-MEM-777888) or patient ID (e.g. pat-001)."""
-    if member_id.startswith("pat-"):
+    """Verify insurance coverage. Staff only. Use member ID (e.g. MEM-987654321, AET-MEM-555123, UHC-MEM-777888) or patient ID (e.g. pat-001, test-pat-001)."""
+    if member_id.startswith("pat-") or member_id.startswith("test-pat-"):
         patient = next((p for p in MOCK_PATIENTS if p["id"] == member_id), None)
         if not patient:
             return _tool_result({"error": f"Patient {member_id} not found"})
@@ -369,7 +394,7 @@ def _build_patient_agent():
         list_providers,
         get_patient_appointments,
         book_appointment,
-        get_medical_info_non_recommendation,
+        search_medical_info,
     ]
     tools_by_name = {t.name: t for t in tools}
     model_with_tools = model.bind_tools(tools)
@@ -440,6 +465,7 @@ def _build_staff_agent():
         get_patient_appointments,
         list_upcoming_appointments,
         book_appointment,
+        search_medical_info,
         lookup_patient_summary,
         verify_insurance,
     ]
@@ -511,7 +537,7 @@ def invoke_patient_agent(
 
     agent = get_patient_agent()
     initial = {"messages": messages, "debug_tool_calls": []}
-    result = agent.invoke(initial, config=get_invoke_config())
+    result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     tool_calls = result.get("debug_tool_calls") if settings.debug_tool_calls else None
@@ -533,7 +559,7 @@ def invoke_staff_agent(
 
     agent = get_staff_agent()
     initial = {"messages": messages, "debug_tool_calls": []}
-    result = agent.invoke(initial, config=get_invoke_config())
+    result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     tool_calls = result.get("debug_tool_calls") if settings.debug_tool_calls else None

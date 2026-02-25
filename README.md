@@ -40,3 +40,18 @@ uvicorn main:app --reload --port 8000
 docker build -t openemr-agent .
 docker run -p 8000:8000 openemr-agent
 ```
+
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+
+# Unit tests only (no API key needed)
+pytest tests/test_tools.py tests/test_api.py -v
+
+# Full golden path including agent integration (requires ANTHROPIC_API_KEY)
+ANTHROPIC_API_KEY=sk-... pytest tests/ -v --timeout=60
+
+# Safety tests only
+ANTHROPIC_API_KEY=sk-... pytest tests/test_safety.py -v --timeout=60
+```

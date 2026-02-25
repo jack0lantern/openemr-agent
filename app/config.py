@@ -22,11 +22,6 @@ class Settings(BaseSettings):
     # Telemetry (PRD §6.2) - OTLP endpoint for Datadog/CloudWatch. Empty = console exporter.
     otel_exporter_otlp_endpoint: str = ""
 
-    # Langfuse observability - optional. Set keys to enable traces in Langfuse dashboard.
-    langfuse_public_key: str = ""
-    langfuse_secret_key: str = ""
-    langfuse_host: str = "https://cloud.langfuse.com"
-
     # Demo: include tool calls in chat response for UI debug box. Set to True to enable.
     debug_tool_calls: bool = False
 
