@@ -44,7 +44,6 @@ _FHIR_SCOPES = (
     "system/Organization.read "
     "system/Location.read "
     # Scheduling
-    "system/Slot.read "
     "system/Schedule.read "
     # Other
     "system/Person.read "
@@ -229,20 +228,6 @@ class FHIRClient:
         if status:
             params["status"] = status
         return await self._request("GET", "Appointment", params=params if params else None)
-
-    async def get_slots(
-        self,
-        start: str | None = None,
-        start_ge: str | None = None,
-        status: str = "free",
-    ) -> dict:
-        """GET /fhir/Slot. start/start_ge in FHIR dateTime format."""
-        params: dict = {"status": status}
-        if start:
-            params["start"] = start
-        if start_ge:
-            params["start"] = f"ge{start_ge}"
-        return await self._request("GET", "Slot", params=params if params else None)
 
     async def get_schedules(self) -> dict:
         """GET /fhir/Schedule."""

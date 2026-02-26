@@ -66,25 +66,6 @@ def _fhir_practitioner_to_provider(resource: dict) -> dict:
     }
 
 
-def _fhir_slot_to_available_slot(slot: dict, schedule_ref: str = "") -> dict:
-    """Transform FHIR Slot to mock slot shape. schedule_ref used to resolve provider."""
-    start = slot.get("start", "")
-    dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
-    date_str = dt.strftime("%Y-%m-%d") if dt else ""
-    time_str = (dt.strftime("%I:%M %p").lstrip("0") if dt else "")  # 9:00 AM (portable)
-
-    return {
-        "id": slot.get("id", ""),
-        "date": date_str,
-        "time": time_str,
-        "providerId": "",
-        "providerName": "",
-        "duration": 30,
-        "location": "",
-        "type": "checkup",
-    }
-
-
 def _fhir_appointment_to_appointment(resource: dict) -> dict:
     """Transform FHIR Appointment to mock appointment shape."""
     start = resource.get("start", "")
@@ -430,22 +411,8 @@ def get_available_slots(date_str: str) -> list[dict]:
     if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         return [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date_str]
 
-    async def _fetch():
-        try:
-            client = get_fhir_client()
-            start_ge = f"{date_str}T00:00:00"
-            bundle = await client.get_slots(start_ge=start_ge, status="free")
-            entries = bundle.get("entry", []) or []
-            return [
-                _fhir_slot_to_available_slot(e.get("resource", {}))
-                for e in entries
-                if e.get("resource", {}).get("resourceType") == "Slot"
-            ]
-        except FHIRRequestError:
-            # OpenEMR does not implement FHIR Slot; return empty rather than failing. AI-generated.
-            return []
-
-    return _run_async(_fetch())
+    # OpenEMR does not support FHIR Slot resources.
+    return []
 
 
 def get_patient_appointments(patient_id: str) -> list[dict]:
