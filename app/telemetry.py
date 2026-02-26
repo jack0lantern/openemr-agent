@@ -9,6 +9,7 @@ tool invocations, and agent workflow spans (OpenInference semantic conventions).
 """
 
 import logging
+import os  # AI-generated
 from typing import Any
 
 from opentelemetry import trace
@@ -18,8 +19,6 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-from app.config import settings
-
 logger = logging.getLogger(__name__)
 
 TRACER = trace.get_tracer("openemr-agent", "0.1.0")
@@ -27,7 +26,7 @@ TRACER = trace.get_tracer("openemr-agent", "0.1.0")
 
 def _create_span_processor() -> BatchSpanProcessor:
     """Create span processor: OTLP if endpoint configured, else console for dev."""
-    endpoint = settings.otel_exporter_otlp_endpoint or ""
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")  # AI-generated
     if endpoint:
         exporter = OTLPSpanExporter(endpoint=endpoint)
         return BatchSpanProcessor(exporter)
@@ -64,7 +63,7 @@ def setup_telemetry(app: Any) -> None:
     )
     logger.info(
         "Telemetry initialized (OTLP endpoint: %s, LangGraph instrumented: %s)",
-        settings.otel_exporter_otlp_endpoint or "console",
+        os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or "console",  # AI-generated
         langgraph_instrumented,
     )
 

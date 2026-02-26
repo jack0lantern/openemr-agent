@@ -2,6 +2,7 @@
 # Handles token acquisition, caching, and FHIR resource queries
 
 import logging
+import os  # AI-generated
 import time
 import uuid
 from pathlib import Path
@@ -9,17 +10,48 @@ from pathlib import Path
 import httpx
 import jwt
 
-from app.config import settings
-
 logger = logging.getLogger(__name__)
 
-# Default FHIR scopes for client credentials (system-level read + write for booking)
+# All FHIR scopes for client credentials (system-level access)
+# OpenEMR 7.0.4 supports these V1 system scopes when rest_system_scopes_api is enabled
 _FHIR_SCOPES = (
     "api:fhir openid "
-    "system/Patient.read system/Practitioner.read system/Appointment.read "
-    "system/Appointment.write system/Slot.read system/Schedule.read "
-    "system/Coverage.read system/Condition.read system/Location.read "
-    "system/Organization.read"
+    # Core clinical resources
+    "system/Patient.read "
+    "system/Practitioner.read "
+    "system/PractitionerRole.read "
+    "system/Encounter.read "
+    "system/Appointment.read "
+    "system/Appointment.write "
+    # Clinical data
+    "system/AllergyIntolerance.read "
+    "system/Condition.read "
+    "system/Procedure.read "
+    "system/Observation.read "
+    "system/DiagnosticReport.read "
+    "system/Immunization.read "
+    "system/MedicationRequest.read "
+    "system/Medication.read "
+    "system/CarePlan.read "
+    "system/CareTeam.read "
+    "system/Goal.read "
+    # Documents & devices
+    "system/DocumentReference.read "
+    "system/Binary.read "
+    "system/Device.read "
+    # Coverage & organization
+    "system/Coverage.read "
+    "system/Organization.read "
+    "system/Location.read "
+    # Scheduling
+    "system/Slot.read "
+    "system/Schedule.read "
+    # Other
+    "system/Person.read "
+    "system/Group.read "
+    "system/Provenance.read "
+    "system/ValueSet.read "
+    "system/OperationDefinition.read"
 )
 
 
@@ -47,11 +79,15 @@ class FHIRClient:
         token_url: str | None = None,
         client_id: str | None = None,
         private_key_path: str | None = None,
+        jwt_audience: str | None = None,
     ) -> None:
-        self._base_url = (base_url or settings.openemr_fhir_url).rstrip("/")
-        self._token_url = token_url or settings.openemr_token_url
-        self._client_id = client_id or settings.openemr_client_id
-        self._private_key_path = Path(private_key_path or settings.private_key_path)
+        # AI-generated
+        self._base_url = (base_url or os.getenv("OPENEMR_FHIR_URL", "http://openemr/apis/default/fhir")).rstrip("/")
+        self._token_url = token_url or os.getenv("OPENEMR_TOKEN_URL", "http://openemr/oauth2/default/token")
+        self._jwt_audience = jwt_audience or os.getenv("OPENEMR_JWT_AUDIENCE") or self._token_url
+        self._client_id = client_id or os.getenv("OPENEMR_CLIENT_ID", "")
+        self._private_key_path = Path(private_key_path or os.getenv("PRIVATE_KEY_PATH", "/app/certs/private_key.pem"))
+        # End AI-generated
         self._access_token: str | None = None
         self._token_expires_at: float = 0.0
         self._client: httpx.AsyncClient | None = None
@@ -76,7 +112,7 @@ class FHIRClient:
         payload = {
             "iss": self._client_id,
             "sub": self._client_id,
-            "aud": self._token_url,
+            "aud": self._jwt_audience,
             "exp": exp,
             "jti": str(uuid.uuid4()),
             "iat": iat,
@@ -239,6 +275,133 @@ class FHIRClient:
     async def get_organizations(self) -> dict:
         """GET /fhir/Organization. Returns facility/clinic resources."""
         return await self._request("GET", "Organization")
+
+    async def get_encounters(
+        self,
+        patient_id: str | None = None,
+        date_ge: str | None = None,
+    ) -> dict:
+        """GET /fhir/Encounter. Optional patient and date filters."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        if date_ge:
+            params["date"] = f"ge{date_ge}"
+        return await self._request("GET", "Encounter", params=params if params else None)
+
+    async def get_allergy_intolerances(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/AllergyIntolerance. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "AllergyIntolerance", params=params if params else None)
+
+    async def get_procedures(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/Procedure. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "Procedure", params=params if params else None)
+
+    async def get_observations(
+        self,
+        patient_id: str | None = None,
+        category: str | None = None,
+        code: str | None = None,
+    ) -> dict:
+        """GET /fhir/Observation. Optional patient, category, and code filters."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        if category:
+            params["category"] = category
+        if code:
+            params["code"] = code
+        return await self._request("GET", "Observation", params=params if params else None)
+
+    async def get_diagnostic_reports(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/DiagnosticReport. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "DiagnosticReport", params=params if params else None)
+
+    async def get_immunizations(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/Immunization. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "Immunization", params=params if params else None)
+
+    async def get_medication_requests(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/MedicationRequest. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "MedicationRequest", params=params if params else None)
+
+    async def get_medications(self) -> dict:
+        """GET /fhir/Medication."""
+        return await self._request("GET", "Medication")
+
+    async def get_care_plans(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/CarePlan. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "CarePlan", params=params if params else None)
+
+    async def get_care_teams(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/CareTeam. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "CareTeam", params=params if params else None)
+
+    async def get_goals(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/Goal. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "Goal", params=params if params else None)
+
+    async def get_document_references(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/DocumentReference. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "DocumentReference", params=params if params else None)
+
+    async def get_devices(
+        self, patient_id: str | None = None
+    ) -> dict:
+        """GET /fhir/Device. Optional patient filter."""
+        params: dict = {}
+        if patient_id:
+            params["patient"] = f"Patient/{patient_id}"
+        return await self._request("GET", "Device", params=params if params else None)
+
+    async def get_practitioner_roles(self) -> dict:
+        """GET /fhir/PractitionerRole."""
+        return await self._request("GET", "PractitionerRole")
 
     async def create_appointment(self, appointment: dict) -> dict:
         """POST /fhir/Appointment to book an appointment."""

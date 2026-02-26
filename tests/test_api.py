@@ -54,7 +54,7 @@ def test_api_03_patient_valid_request_returns_200(client, disable_auth):
 
 def test_api_04_patient_missing_auth_when_required_returns_401(client, monkeypatch):
     """API-04: POST /api/chat/patient missing auth when required returns 401."""
-    monkeypatch.setattr("app.config.settings.patient_auth_required", True)
+    monkeypatch.setenv("PATIENT_AUTH_REQUIRED", "true")  # AI-generated
     response = client.post(
         "/api/chat/patient",
         json={"messages": [{"role": "user", "content": "What are your hours?"}]},
@@ -102,7 +102,7 @@ def test_api_07_staff_valid_request_returns_200(client, disable_auth):
 
 def test_api_08_staff_missing_auth_when_required_returns_401(client, monkeypatch):
     """API-08: POST /api/chat/staff missing auth when required returns 401."""
-    monkeypatch.setattr("app.config.settings.staff_auth_required", True)
+    monkeypatch.setenv("STAFF_AUTH_REQUIRED", "true")  # AI-generated
     response = client.post(
         "/api/chat/staff",
         json={"messages": [{"role": "user", "content": "What appointments are coming up?"}]},

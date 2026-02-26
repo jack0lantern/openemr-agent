@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.oauth import router as oauth_router
 from app.api.patient import router as patient_router
 from app.api.staff import router as staff_router
 from app.langsmith_client import flush_langsmith
@@ -38,6 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(oauth_router)
 app.include_router(patient_router)
 app.include_router(staff_router)
 
@@ -57,5 +59,6 @@ async def root() -> dict:
         "endpoints": {
             "patient": "POST /api/chat/patient (Bearer token required)",
             "staff": "POST /api/chat/staff (Bearer token required)",
+            "oauth": "GET /oauth/callback, /oauth/launch, /oauth/logout",
         },
     }

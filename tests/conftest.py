@@ -52,25 +52,25 @@ def patch_mock_data(monkeypatch):
 @pytest.fixture(autouse=True)
 def ensure_use_mock_data(monkeypatch):
     """Ensure tests use mock data (default; avoids FHIR connectivity)."""
-    monkeypatch.setattr("app.config.settings.use_mock_data", True)
+    monkeypatch.setenv("USE_MOCK_DATA", "true")  # AI-generated
 
 
 @pytest.fixture
 def enable_debug_tool_calls(monkeypatch):
     """Enable tool call introspection for integration tests."""
-    monkeypatch.setattr("app.config.settings.debug_tool_calls", True)
+    monkeypatch.setenv("DEBUG_TOOL_CALLS", "true")  # AI-generated
 
 
 @pytest.fixture
 def disable_auth(monkeypatch):
     """Disable auth requirements for API tests."""
-    monkeypatch.setattr("app.config.settings.patient_auth_required", False)
-    monkeypatch.setattr("app.config.settings.staff_auth_required", False)
+    monkeypatch.setenv("PATIENT_AUTH_REQUIRED", "false")  # AI-generated
+    monkeypatch.setenv("STAFF_AUTH_REQUIRED", "false")  # AI-generated
 
 
 @pytest.fixture
 def set_anthropic_api_key(monkeypatch):
     """Set anthropic_api_key from env for integration tests."""
     key = os.environ.get("ANTHROPIC_API_KEY", "")
-    monkeypatch.setattr("app.config.settings.anthropic_api_key", key)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", key)  # AI-generated
     return key

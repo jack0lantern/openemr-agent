@@ -2,9 +2,9 @@
 # Returns identical dict shapes for agent tools regardless of data source
 
 import asyncio
+import os  # AI-generated
 from datetime import date, datetime
 
-from app.config import settings
 from app.data.mock_data import (
     MOCK_APPOINTMENTS,
     MOCK_AVAILABLE_SLOTS,
@@ -182,6 +182,182 @@ def _fhir_condition_to_condition(resource: dict) -> dict:
     }
 
 
+def _fhir_encounter_to_encounter(resource: dict) -> dict:
+    """Transform FHIR Encounter to encounter dict."""
+    period = resource.get("period", {})
+    start = period.get("start", "")
+    dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
+
+    participant = resource.get("participant", []) or []
+    practitioner_ref = ""
+    for p in participant:
+        ref = p.get("individual", {}).get("reference", "")
+        if "Practitioner/" in ref:
+            practitioner_ref = ref
+            break
+
+    reason_codes = resource.get("reasonCode", []) or []
+    reason = reason_codes[0].get("text", "") if reason_codes else ""
+
+    return {
+        "id": resource.get("id", ""),
+        "status": resource.get("status", ""),
+        "class": resource.get("class", {}).get("code", ""),
+        "type": (resource.get("type", [{}])[0].get("text", "") if resource.get("type") else ""),
+        "date": dt.strftime("%Y-%m-%d") if dt else "",
+        "practitionerId": practitioner_ref.replace("Practitioner/", ""),
+        "reason": reason,
+    }
+
+
+def _fhir_allergy_to_allergy(resource: dict) -> dict:
+    """Transform FHIR AllergyIntolerance to allergy dict."""
+    code = resource.get("code", {})
+    coding = code.get("coding", [{}])[0] if code.get("coding") else {}
+    reactions = resource.get("reaction", []) or []
+    manifestations = []
+    for r in reactions:
+        for m in r.get("manifestation", []) or []:
+            manifestations.append(m.get("text", m.get("coding", [{}])[0].get("display", "")))
+
+    return {
+        "id": resource.get("id", ""),
+        "substance": coding.get("display", code.get("text", "Unknown")),
+        "clinicalStatus": resource.get("clinicalStatus", {}).get("coding", [{}])[0].get("code", ""),
+        "criticality": resource.get("criticality", ""),
+        "type": resource.get("type", ""),
+        "reactions": manifestations,
+    }
+
+
+def _fhir_procedure_to_procedure(resource: dict) -> dict:
+    """Transform FHIR Procedure to procedure dict."""
+    code = resource.get("code", {})
+    coding = code.get("coding", [{}])[0] if code.get("coding") else {}
+    performed = resource.get("performedDateTime", resource.get("performedPeriod", {}).get("start", ""))
+
+    return {
+        "id": resource.get("id", ""),
+        "name": coding.get("display", code.get("text", "Unknown")),
+        "status": resource.get("status", ""),
+        "date": performed[:10] if performed else "",
+    }
+
+
+def _fhir_observation_to_observation(resource: dict) -> dict:
+    """Transform FHIR Observation to observation dict."""
+    code = resource.get("code", {})
+    coding = code.get("coding", [{}])[0] if code.get("coding") else {}
+
+    value = ""
+    unit = ""
+    if "valueQuantity" in resource:
+        vq = resource["valueQuantity"]
+        value = str(vq.get("value", ""))
+        unit = vq.get("unit", vq.get("code", ""))
+    elif "valueCodeableConcept" in resource:
+        vc = resource["valueCodeableConcept"]
+        value = vc.get("text", vc.get("coding", [{}])[0].get("display", ""))
+    elif "valueString" in resource:
+        value = resource["valueString"]
+
+    effective = resource.get("effectiveDateTime", "")
+
+    category_list = resource.get("category", []) or []
+    category = category_list[0].get("coding", [{}])[0].get("code", "") if category_list else ""
+
+    return {
+        "id": resource.get("id", ""),
+        "name": coding.get("display", code.get("text", "Unknown")),
+        "value": value,
+        "unit": unit,
+        "date": effective[:10] if effective else "",
+        "category": category,
+        "status": resource.get("status", ""),
+    }
+
+
+def _fhir_immunization_to_immunization(resource: dict) -> dict:
+    """Transform FHIR Immunization to immunization dict."""
+    vaccine = resource.get("vaccineCode", {})
+    coding = vaccine.get("coding", [{}])[0] if vaccine.get("coding") else {}
+    occurrence = resource.get("occurrenceDateTime", "")
+
+    return {
+        "id": resource.get("id", ""),
+        "vaccine": coding.get("display", vaccine.get("text", "Unknown")),
+        "date": occurrence[:10] if occurrence else "",
+        "status": resource.get("status", ""),
+    }
+
+
+def _fhir_medication_request_to_medication(resource: dict) -> dict:
+    """Transform FHIR MedicationRequest to medication dict."""
+    med = resource.get("medicationCodeableConcept", {})
+    coding = med.get("coding", [{}])[0] if med.get("coding") else {}
+
+    dosage = resource.get("dosageInstruction", [{}])
+    dosage_text = dosage[0].get("text", "") if dosage else ""
+
+    return {
+        "id": resource.get("id", ""),
+        "medication": coding.get("display", med.get("text", "Unknown")),
+        "status": resource.get("status", ""),
+        "dosage": dosage_text,
+        "authoredOn": resource.get("authoredOn", "")[:10] if resource.get("authoredOn") else "",
+    }
+
+
+def _fhir_diagnostic_report_to_report(resource: dict) -> dict:
+    """Transform FHIR DiagnosticReport to report dict."""
+    code = resource.get("code", {})
+    coding = code.get("coding", [{}])[0] if code.get("coding") else {}
+    effective = resource.get("effectiveDateTime", "")
+
+    return {
+        "id": resource.get("id", ""),
+        "name": coding.get("display", code.get("text", "Unknown")),
+        "status": resource.get("status", ""),
+        "date": effective[:10] if effective else "",
+        "conclusion": resource.get("conclusion", ""),
+    }
+
+
+def _fhir_care_plan_to_care_plan(resource: dict) -> dict:
+    """Transform FHIR CarePlan to care plan dict."""
+    categories = resource.get("category", []) or []
+    category = categories[0].get("text", "") if categories else ""
+
+    return {
+        "id": resource.get("id", ""),
+        "status": resource.get("status", ""),
+        "intent": resource.get("intent", ""),
+        "title": resource.get("title", ""),
+        "category": category,
+        "description": resource.get("description", ""),
+    }
+
+
+def _fhir_care_team_to_care_team(resource: dict) -> dict:
+    """Transform FHIR CareTeam to care team dict."""
+    participants = []
+    for p in resource.get("participant", []) or []:
+        member = p.get("member", {})
+        role = p.get("role", [{}])[0].get("text", "") if p.get("role") else ""
+        participants.append({
+            "name": member.get("display", ""),
+            "role": role,
+            "reference": member.get("reference", ""),
+        })
+
+    return {
+        "id": resource.get("id", ""),
+        "name": resource.get("name", ""),
+        "status": resource.get("status", ""),
+        "participants": participants,
+    }
+
+
 def _fhir_organization_to_clinic(resource: dict) -> dict:
     """Transform FHIR Organization to clinic dict shape. Hours/parking not in FHIR; left empty."""
     addr = resource.get("address", [{}])[0] if resource.get("address") else {}
@@ -221,7 +397,7 @@ def _run_async(coro):
 
 def get_providers(specialty: str = "") -> list[dict]:
     """Get providers, optionally filtered by specialty."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         providers = MOCK_PROVIDERS
         if specialty:
             providers = [
@@ -244,33 +420,37 @@ def get_providers(specialty: str = "") -> list[dict]:
 
 def get_available_dates() -> list[str]:
     """Get list of dates that have available slots (for fallback message)."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         return sorted({s["date"] for s in MOCK_AVAILABLE_SLOTS})
     return []
 
 
 def get_available_slots(date_str: str) -> list[dict]:
     """Get available appointment slots for a date. date_str in YYYY-MM-DD."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         return [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date_str]
 
     async def _fetch():
-        client = get_fhir_client()
-        start_ge = f"{date_str}T00:00:00"
-        bundle = await client.get_slots(start_ge=start_ge, status="free")
-        entries = bundle.get("entry", []) or []
-        return [
-            _fhir_slot_to_available_slot(e.get("resource", {}))
-            for e in entries
-            if e.get("resource", {}).get("resourceType") == "Slot"
-        ]
+        try:
+            client = get_fhir_client()
+            start_ge = f"{date_str}T00:00:00"
+            bundle = await client.get_slots(start_ge=start_ge, status="free")
+            entries = bundle.get("entry", []) or []
+            return [
+                _fhir_slot_to_available_slot(e.get("resource", {}))
+                for e in entries
+                if e.get("resource", {}).get("resourceType") == "Slot"
+            ]
+        except FHIRRequestError:
+            # OpenEMR does not implement FHIR Slot; return empty rather than failing. AI-generated.
+            return []
 
     return _run_async(_fetch())
 
 
 def get_patient_appointments(patient_id: str) -> list[dict]:
     """Get appointments for a patient."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         return [a for a in MOCK_APPOINTMENTS if a["patientId"] == patient_id]
 
     async def _fetch():
@@ -305,7 +485,7 @@ def _time_sort_key(time_str: str) -> tuple[int, int]:
 def get_upcoming_appointments(today: str | None = None) -> list[dict]:
     """Get upcoming appointments (date >= today, not cancelled/completed)."""
     today_str = today or _today().isoformat()
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         apts = [
             a
             for a in MOCK_APPOINTMENTS
@@ -334,7 +514,7 @@ def book_appointment(patient_id: str, slot_id: str) -> dict:
     Book an appointment. Returns {success, appointment?, error?, suggestion?}.
     Mock: returns confirmation. FHIR: POSTs Appointment.
     """
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         slot = next((s for s in MOCK_AVAILABLE_SLOTS if s["id"] == slot_id), None)
         if not slot:
             return {
@@ -395,7 +575,7 @@ def book_appointment(patient_id: str, slot_id: str) -> dict:
 
 def get_patient_summary(patient_id: str) -> dict:
     """Get patient summary with insurance and recent appointments."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         patient = next((p for p in MOCK_PATIENTS if p["id"] == patient_id), None)
         if not patient:
             return {"error": f"Patient {patient_id} not found"}
@@ -479,7 +659,7 @@ def get_patient_summary(patient_id: str) -> dict:
 
 def verify_insurance(member_id: str) -> dict:
     """Verify insurance by member ID or patient ID."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         if member_id.startswith("pat-") or member_id.startswith("test-pat-"):
             patient = next((p for p in MOCK_PATIENTS if p["id"] == member_id), None)
             if not patient:
@@ -551,7 +731,7 @@ def verify_insurance(member_id: str) -> dict:
 
 def search_conditions(symptoms: str) -> list[dict]:
     """Search conditions by symptoms. Keeps mock for educational content per prompt."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         query = (symptoms or "").lower().strip()
         if not query:
             return []
@@ -586,7 +766,7 @@ def search_conditions(symptoms: str) -> list[dict]:
 
 def get_clinic_info(query: str = "") -> dict:
     """Get clinic info and optionally filtered providers."""
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         q = query.lower().strip() if query else ""
         if q:
             providers = [
@@ -653,7 +833,7 @@ def get_my_appointment_locations(patient_id: str, today: str | None = None) -> d
     Returns locations from upcoming (date >= today, not cancelled/completed) appointments.
     """
     today_str = today or _today().isoformat()
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         apts = [
             a
             for a in MOCK_APPOINTMENTS
@@ -707,7 +887,7 @@ def get_staff_assigned_clinic(staff_id: str) -> dict:
     Use when staff asks "where is the clinic" or "where is my clinic".
     Returns assigned facility address, phone, hours.
     """
-    if settings.use_mock_data:
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         staff = next((s for s in MOCK_STAFF if s["id"] == staff_id), None)
         if not staff:
             return {"staff_id": staff_id, "error": f"Staff {staff_id} not found"}
@@ -753,6 +933,171 @@ def get_staff_assigned_clinic(staff_id: str) -> dict:
                 "hours": clinic.get("hours", ""),
             },
         }
+
+    return _run_async(_fetch())
+
+
+def get_patient_allergies(patient_id: str) -> list[dict]:
+    """Get allergies for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_allergy_intolerances(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_allergy_to_allergy(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "AllergyIntolerance"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_medications(patient_id: str) -> list[dict]:
+    """Get active medication requests for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_medication_requests(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_medication_request_to_medication(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "MedicationRequest"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_observations(patient_id: str, category: str = "") -> list[dict]:
+    """Get observations (vitals, labs, etc.) for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_observations(
+            patient_id=patient_id,
+            category=category if category else None,
+        )
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_observation_to_observation(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "Observation"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_encounters(patient_id: str) -> list[dict]:
+    """Get encounters for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_encounters(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_encounter_to_encounter(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "Encounter"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_immunizations(patient_id: str) -> list[dict]:
+    """Get immunizations for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_immunizations(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_immunization_to_immunization(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "Immunization"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_procedures(patient_id: str) -> list[dict]:
+    """Get procedures for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_procedures(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_procedure_to_procedure(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "Procedure"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_diagnostic_reports(patient_id: str) -> list[dict]:
+    """Get diagnostic reports for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_diagnostic_reports(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_diagnostic_report_to_report(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "DiagnosticReport"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_care_plans(patient_id: str) -> list[dict]:
+    """Get care plans for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_care_plans(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_care_plan_to_care_plan(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "CarePlan"
+        ]
+
+    return _run_async(_fetch())
+
+
+def get_patient_care_teams(patient_id: str) -> list[dict]:
+    """Get care teams for a patient."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+        return []
+
+    async def _fetch():
+        client = get_fhir_client()
+        bundle = await client.get_care_teams(patient_id=patient_id)
+        entries = bundle.get("entry", []) or []
+        return [
+            _fhir_care_team_to_care_team(e.get("resource", {}))
+            for e in entries
+            if e.get("resource", {}).get("resourceType") == "CareTeam"
+        ]
 
     return _run_async(_fetch())
 

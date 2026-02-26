@@ -6,11 +6,11 @@ bloodwork review for triage. Administrative Worker tools for phpGACL and schedul
 """
 
 import asyncio
+import os  # AI-generated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.config import settings
 from app.llm.agent import invoke_staff_agent
 from app.schemas import ChatRequest, ChatResponse
 from app.telemetry import get_tracer
@@ -45,7 +45,7 @@ async def staff_chat(
     Supports: scheduling, insurance verification, medication order drafts,
     bloodwork review for triage, phpGACL and administrative tools.
     """
-    if settings.staff_auth_required and not token:
+    if os.getenv("STAFF_AUTH_REQUIRED", "true").lower() == "true" and not token:  # AI-generated
         raise HTTPException(
             status_code=401,
             detail="Authorization required. OAuth token with staff scope is required.",
@@ -65,14 +65,14 @@ async def staff_chat(
         span.set_attribute("message.length", len(user_input))
 
         try:
-            if not settings.anthropic_api_key:
+            if not os.getenv("ANTHROPIC_API_KEY", ""):  # AI-generated
                 return ChatResponse(
                     message=f"I'm your staff assistant. You asked: \"{user_input}\"\n\n"
                     "LLM integration requires ANTHROPIC_API_KEY. Please call IT support at "
-                    f"{settings.escalation_phone} or escalate to a human staff member."
+                    f"{os.getenv('ESCALATION_PHONE', '555-0199')} or escalate to a human staff member."  # AI-generated
                 )
             history = _build_history(body.messages)
-            staff_id = body.staff_id if body.staff_id is not None else settings.default_staff_id
+            staff_id = body.staff_id if body.staff_id is not None else os.getenv("DEFAULT_STAFF_ID")  # AI-generated
             message, tool_calls = await asyncio.to_thread(
                 invoke_staff_agent,
                 user_input,
@@ -83,5 +83,5 @@ async def staff_chat(
         except Exception as e:
             span.record_exception(e)
             return ChatResponse(
-                message=f"Sorry, I couldn't process your request. Please call IT support at {settings.escalation_phone} or escalate to a human staff member."
+                message=f"Sorry, I couldn't process your request. Please call IT support at {os.getenv('ESCALATION_PHONE', '555-0199')} or escalate to a human staff member."  # AI-generated
             )

@@ -7,11 +7,11 @@ to the authenticated patient (no "God Mode" API key).
 """
 
 import asyncio
+import os  # AI-generated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.config import settings
 from app.llm.agent import invoke_patient_agent
 from app.schemas import ChatRequest, ChatResponse
 from app.telemetry import get_tracer
@@ -45,7 +45,7 @@ async def patient_chat(
     tied to the authenticated patient. When False, allows unauthenticated access.
     Supports: appointment info, clinic info, booking/modify/cancel, non-diagnostic medical info.
     """
-    if settings.patient_auth_required and not token:
+    if os.getenv("PATIENT_AUTH_REQUIRED", "true").lower() == "true" and not token:  # AI-generated
         raise HTTPException(
             status_code=401,
             detail="Authorization required. OAuth token tied to the authenticated patient is required.",
@@ -65,14 +65,14 @@ async def patient_chat(
         span.set_attribute("message.length", len(user_input))
 
         try:
-            if not settings.anthropic_api_key:
+            if not os.getenv("ANTHROPIC_API_KEY", ""):  # AI-generated
                 return ChatResponse(
                     message=f"I'm your patient assistant. You asked: \"{user_input}\"\n\n"
                     "LLM integration requires ANTHROPIC_API_KEY. Please call the front desk at "
-                    f"{settings.escalation_phone} for assistance."
+                    f"{os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."  # AI-generated
                 )
             history = _build_history(body.messages)
-            patient_id = body.patient_id if body.patient_id is not None else settings.default_patient_id
+            patient_id = body.patient_id if body.patient_id is not None else os.getenv("DEFAULT_PATIENT_ID")  # AI-generated
             message, tool_calls = await asyncio.to_thread(
                 invoke_patient_agent,
                 user_input,
@@ -83,5 +83,5 @@ async def patient_chat(
         except Exception as e:
             span.record_exception(e)
             return ChatResponse(
-                message=f"Sorry, I couldn't process your request. Please call the front desk at {settings.escalation_phone} for assistance."
+                message=f"Sorry, I couldn't process your request. Please call the front desk at {os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."  # AI-generated
             )

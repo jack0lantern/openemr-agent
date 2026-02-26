@@ -5,9 +5,10 @@ Runs multiple agent invocations in parallel via LangGraph's batch() to reduce
 golden path test suite wall time. Not used in production.
 """
 
+import os  # AI-generated
+
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.config import settings
 from app.llm.agent import get_patient_agent, get_staff_agent
 
 
@@ -40,7 +41,7 @@ def batch_invoke_patient_agent(
     for result in results:
         final = result["messages"][-1]
         message = final.content if hasattr(final, "content") else str(final)
-        tool_calls = result.get("debug_tool_calls") if settings.debug_tool_calls else None
+        tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None  # AI-generated
         outputs.append((message, tool_calls))
     return outputs
 
@@ -59,6 +60,6 @@ def batch_invoke_staff_agent(
     for result in results:
         final = result["messages"][-1]
         message = final.content if hasattr(final, "content") else str(final)
-        tool_calls = result.get("debug_tool_calls") if settings.debug_tool_calls else None
+        tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None  # AI-generated
         outputs.append((message, tool_calls))
     return outputs
