@@ -13,7 +13,9 @@ from app.llm.agent import (
     book_appointment,
     get_appointment_availability,
     get_clinic_info,
+    get_my_appointment_locations,
     get_patient_appointments,
+    get_staff_assigned_clinic,
     list_providers,
     list_upcoming_appointments,
     lookup_patient_summary,
@@ -128,6 +130,45 @@ def test_get_patient_appointments_no_appointments_returns_empty_with_message():
     assert data["patient_id"] == "test-pat-004"
     assert data["appointments"] == []
     assert "message" in data
+
+
+# --- get_my_appointment_locations ---
+
+
+def test_get_my_appointment_locations_with_upcoming_returns_locations():
+    result = get_my_appointment_locations.invoke({"patient_id": "test-pat-001"})
+    data = _parse_tool_result(result)
+    assert data["patient_id"] == "test-pat-001"
+    assert len(data["locations"]) >= 1
+    assert any("Main Clinic" in loc["location"] for loc in data["locations"])
+
+
+def test_get_my_appointment_locations_no_upcoming_returns_empty():
+    result = get_my_appointment_locations.invoke({"patient_id": "test-pat-004"})
+    data = _parse_tool_result(result)
+    assert data["patient_id"] == "test-pat-004"
+    assert data["locations"] == []
+    assert "message" in data
+
+
+# --- get_staff_assigned_clinic ---
+
+
+def test_get_staff_assigned_clinic_valid_staff_returns_facility():
+    result = get_staff_assigned_clinic.invoke({"staff_id": "test-staff-001"})
+    data = _parse_tool_result(result)
+    assert data["staff_id"] == "test-staff-001"
+    assert "facility" in data
+    assert "Test Main Clinic" in data["facility"]["name"]
+    assert "123 Healthcare" in data["facility"]["address"]
+    assert "555-0199" in data["facility"]["phone"]
+
+
+def test_get_staff_assigned_clinic_invalid_staff_returns_error():
+    result = get_staff_assigned_clinic.invoke({"staff_id": "invalid-staff-999"})
+    data = _parse_tool_result(result)
+    assert data["staff_id"] == "invalid-staff-999"
+    assert "error" in data
 
 
 # --- Tool 5: book_appointment ---
@@ -265,6 +306,15 @@ def test_list_upcoming_appointments_sorted_by_date_time():
     result = list_upcoming_appointments.invoke({})
     data = _parse_tool_result(result)
     appointments = data["appointments"]
+    from datetime import datetime
+
+    def _sort_key(apt):
+        try:
+            t = datetime.strptime(apt["time"].strip(), "%I:%M %p")
+            return (apt["date"], t.hour * 60 + t.minute)
+        except (ValueError, TypeError):
+            return (apt["date"], 0)
+
     for i in range(len(appointments) - 1):
         a, b = appointments[i], appointments[i + 1]
-        assert (a["date"], a["time"]) <= (b["date"], b["time"])
+        assert _sort_key(a) <= _sort_key(b)

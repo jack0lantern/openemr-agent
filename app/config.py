@@ -25,5 +25,14 @@ class Settings(BaseSettings):
     # Demo: include tool calls in chat response for UI debug box. Set to True to enable.
     debug_tool_calls: bool = False
 
+    # When True, agent tools use mock data from app/data/mock_data.py.
+    # When False, tools use live OpenEMR FHIR API. Set USE_MOCK_DATA=false to switch.
+    use_mock_data: bool = False
+
+    # Demo: default patient_id/staff_id when request omits them (e.g. unauthenticated dev).
+    # In production, resolve from OAuth token claims.
+    default_patient_id: str | None = None
+    default_staff_id: str | None = None
+
 
 settings = Settings()

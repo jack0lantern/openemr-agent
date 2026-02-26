@@ -72,8 +72,12 @@ async def patient_chat(
                     f"{settings.escalation_phone} for assistance."
                 )
             history = _build_history(body.messages)
+            patient_id = body.patient_id if body.patient_id is not None else settings.default_patient_id
             message, tool_calls = await asyncio.to_thread(
-                invoke_patient_agent, user_input, history=history if history else None
+                invoke_patient_agent,
+                user_input,
+                history=history if history else None,
+                patient_id=patient_id,
             )
             return ChatResponse(message=message, tool_calls=tool_calls)
         except Exception as e:

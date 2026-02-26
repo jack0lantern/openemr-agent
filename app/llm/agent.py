@@ -18,16 +18,22 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph, add_messages
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 from app.config import settings
-from app.data.mock_data import (
-    MOCK_APPOINTMENTS,
-    MOCK_AVAILABLE_SLOTS,
-    MOCK_INSURANCE_PLANS,
-    MOCK_MEDICAL_CONDITIONS,
-    MOCK_PATIENTS,
-    MOCK_PROVIDERS,
+from app.services.data_service import (
+    book_appointment as _book_appointment_svc,
+    get_available_dates,
+    get_available_slots,
+    get_clinic_info as _get_clinic_info_svc,
+    get_my_appointment_locations as _get_my_appointment_locations_svc,
+    get_patient_appointments as _get_patient_appointments_svc,
+    get_patient_summary as _get_patient_summary_svc,
+    get_providers,
+    get_staff_assigned_clinic as _get_staff_assigned_clinic_svc,
+    get_upcoming_appointments as _get_upcoming_appointments_svc,
+    search_conditions as _search_conditions_svc,
+    verify_insurance as _verify_insurance_svc,
 )
 
 
@@ -43,47 +49,21 @@ def _tool_result(data: dict) -> str:
 @tool
 def get_clinic_info(query: str) -> str:
     """Get clinic information: hours, location, contact. Use for appointment locations and clinic info questions. Query can filter providers by specialty or name (e.g. 'pediatrics', 'Dr. Chen')."""
-    q = query.lower().strip() if query else ""
-    if q:
-        providers = [
-            p
-            for p in MOCK_PROVIDERS
-            if q in p["name"].lower() or q in p["specialty"].lower()
-        ]
-    else:
-        providers = MOCK_PROVIDERS
-    return _tool_result({
-        "clinic": {
-            "address": "123 Healthcare Ave, Suite 100",
-            "hours": "Mon–Fri 8am–5pm",
-            "parking": "Free parking in the lot behind the building",
-            "phone": "555-0199",
-        },
-        "providers": [
-            {
-                "id": p["id"],
-                "name": p["name"],
-                "specialty": p["specialty"],
-                "phone": p["phone"],
-                "email": p["email"],
-            }
-            for p in providers
-        ],
-        "query_filter": query or None,
-    })
+    data = _get_clinic_info_svc(query or "")
+    return _tool_result(data)
 
 
 @tool
 def get_appointment_availability(date: str) -> str:
     """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') and pass YYYY-MM-DD format (e.g. 2025-02-25)."""
-    slots = [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date]
-    available_dates = sorted({s["date"] for s in MOCK_AVAILABLE_SLOTS})
+    slots = get_available_slots(date)
+    available_dates = sorted({s["date"] for s in slots}) if slots else get_available_dates()
     if not slots:
         return _tool_result({
             "date": date,
             "slots": [],
             "available_dates": available_dates,
-            "message": f"No slots for {date}. Try: {', '.join(available_dates)}",
+            "message": f"No slots for {date}. Try: {', '.join(available_dates)}" if available_dates else f"No slots for {date}.",
         })
     return _tool_result({
         "date": date,
@@ -104,12 +84,7 @@ def get_appointment_availability(date: str) -> str:
 @tool
 def list_providers(specialty: str = "") -> str:
     """List providers. Optionally filter by specialty (e.g. Family Medicine, Pediatrics, Internal Medicine)."""
-    if specialty:
-        providers = [
-            p for p in MOCK_PROVIDERS if specialty.lower() in p["specialty"].lower()
-        ]
-    else:
-        providers = MOCK_PROVIDERS
+    providers = get_providers(specialty)
     if not providers:
         return _tool_result({
             "providers": [],
@@ -137,7 +112,7 @@ def list_providers(specialty: str = "") -> str:
 @tool
 def get_patient_appointments(patient_id: str) -> str:
     """Get appointments for a patient by ID (e.g. pat-001, pat-002). Use for patient's own appointments or staff lookups."""
-    apts = [a for a in MOCK_APPOINTMENTS if a["patientId"] == patient_id]
+    apts = _get_patient_appointments_svc(patient_id)
     if not apts:
         return _tool_result({
             "patient_id": patient_id,
@@ -162,16 +137,26 @@ def get_patient_appointments(patient_id: str) -> str:
     })
 
 
+# AI-generated: clinic location tools for patient (appointment locations) and staff (assigned facility)
+@tool
+def get_my_appointment_locations(patient_id: str) -> str:
+    """Get locations of the patient's upcoming appointments. Use when a patient asks 'where is my clinic' or 'where are my appointments'—return the locations where they have upcoming visits."""
+    data = _get_my_appointment_locations_svc(patient_id)
+    return _tool_result(data)
+
+
+@tool
+def get_staff_assigned_clinic(staff_id: str) -> str:
+    """Get the clinic/facility assigned to a staff member. Use when staff asks 'where is the clinic' or 'where is my clinic'—return their assigned facility address and hours."""
+    data = _get_staff_assigned_clinic_svc(staff_id)
+    return _tool_result(data)
+# End AI-generated code
+
+
 @tool
 def list_upcoming_appointments() -> str:
     """List upcoming appointments across all patients. Staff only."""
-    today = "2025-02-24"
-    upcoming = [
-        a
-        for a in MOCK_APPOINTMENTS
-        if a["date"] >= today and a["status"] not in ("cancelled", "completed")
-    ]
-    upcoming.sort(key=lambda a: (a["date"], a["time"]))
+    upcoming = _get_upcoming_appointments_svc()
     return _tool_result({
         "appointments": [
             {
@@ -191,32 +176,8 @@ def list_upcoming_appointments() -> str:
 @tool
 def book_appointment(patient_id: str, slot_id: str) -> str:
     """Book an appointment for a patient using an available slot ID (e.g. slot-001). Returns confirmation."""
-    slot = next((s for s in MOCK_AVAILABLE_SLOTS if s["id"] == slot_id), None)
-    if not slot:
-        return _tool_result({
-            "success": False,
-            "error": f"Slot {slot_id} not found",
-            "suggestion": "Use get_appointment_availability to see available slots",
-        })
-    patient = next((p for p in MOCK_PATIENTS if p["id"] == patient_id), None)
-    if not patient:
-        return _tool_result({
-            "success": False,
-            "error": f"Patient {patient_id} not found",
-        })
-    return _tool_result({
-        "success": True,
-        "appointment": {
-            "patientName": patient["name"],
-            "date": slot["date"],
-            "time": slot["time"],
-            "providerName": slot["providerName"],
-            "type": slot["type"],
-            "duration": slot["duration"],
-            "location": slot["location"],
-        },
-        "confirmation_note": "Confirmation will be sent via email",
-    })
+    result = _book_appointment_svc(patient_id, slot_id)
+    return _tool_result(result)
 
 
 @tool
@@ -230,21 +191,7 @@ def search_medical_info(symptoms: str) -> str:
             "disclaimer": "This is educational information only. It does not constitute medical advice, diagnosis, or treatment. Always consult your healthcare provider for personal medical guidance.",
             "message": "Please provide symptom keywords to search (e.g. headache, cough, stomach pain).",
         })
-    # Match conditions where any common_symptom contains any query term
-    query_terms = [t for t in query.split() if len(t) >= 2]
-    matches = []
-    for cond in MOCK_MEDICAL_CONDITIONS:
-        symptom_text = " ".join(cond["common_symptoms"]).lower()
-        cond_name_lower = cond["name"].lower()
-        if any(
-            term in symptom_text or term in cond_name_lower
-            for term in query_terms
-        ):
-            matches.append({
-                "name": cond["name"],
-                "description": cond["description"],
-                "common_symptoms": cond["common_symptoms"],
-            })
+    matches = _search_conditions_svc(symptoms)
     return _tool_result({
         "conditions": matches,
         "query": symptoms,
@@ -257,102 +204,29 @@ def search_medical_info(symptoms: str) -> str:
 @tool
 def lookup_patient_summary(patient_id: str) -> str:
     """Look up a patient's summary for triage context. Staff only. Use patient ID (e.g. pat-001)."""
-    patient = next((p for p in MOCK_PATIENTS if p["id"] == patient_id), None)
-    if not patient:
-        return _tool_result({
-            "error": f"Patient {patient_id} not found",
-        })
-    ins = next(
-        (
-            i
-            for i in MOCK_INSURANCE_PLANS
-            if i["id"] == patient.get("insurancePlanId")
-        ),
-        None,
-    )
-    prov = next(
-        (
-            p
-            for p in MOCK_PROVIDERS
-            if p["id"] == patient.get("primaryCareProviderId")
-        ),
-        None,
-    )
-    apts = [a for a in MOCK_APPOINTMENTS if a["patientId"] == patient_id]
-    return _tool_result({
-        "patient": {
-            "id": patient["id"],
-            "name": patient["name"],
-            "dateOfBirth": patient["dateOfBirth"],
-            "phone": patient["phone"],
-            "email": patient["email"],
-            "address": patient["address"],
-            "emergencyContact": patient.get("emergencyContact"),
-            "emergencyContactPhone": patient.get("emergencyContactPhone"),
-        },
-        "insurance": {
-            "payerName": ins["payerName"],
-            "planName": ins["planName"],
-            "memberId": ins["memberId"],
-        } if ins else None,
-        "primaryCareProvider": prov["name"] if prov else None,
-        "recentAppointments": [
-            {"date": a["date"], "time": a["time"], "status": a["status"]}
-            for a in apts[:5]
-        ],
-    })
+    result = _get_patient_summary_svc(patient_id)
+    if "error" in result:
+        return _tool_result(result)
+    return _tool_result(result)
 
 
 @tool
 def verify_insurance(member_id: str) -> str:
     """Verify insurance coverage. Staff only. Use member ID (e.g. MEM-987654321, AET-MEM-555123, UHC-MEM-777888) or patient ID (e.g. pat-001, test-pat-001)."""
-    if member_id.startswith("pat-") or member_id.startswith("test-pat-"):
-        patient = next((p for p in MOCK_PATIENTS if p["id"] == member_id), None)
-        if not patient:
-            return _tool_result({"error": f"Patient {member_id} not found"})
-        plan = next(
-            (
-                i
-                for i in MOCK_INSURANCE_PLANS
-                if i["id"] == patient.get("insurancePlanId")
-            ),
-            None,
-        )
-        if not plan:
-            return _tool_result({
-                "error": f"Patient {member_id} has no insurance on file",
-            })
-    else:
-        plan = next(
-            (i for i in MOCK_INSURANCE_PLANS if i["memberId"] == member_id),
-            None,
-        )
-        if not plan:
-            return _tool_result({
-                "error": f"No active insurance found for member ID {member_id}",
-            })
-    return _tool_result({
-        "memberId": plan["memberId"],
-        "plan": {
-            "payerName": plan["payerName"],
-            "planName": plan["planName"],
-            "planType": plan["planType"],
-            "groupNumber": plan["groupNumber"],
-            "status": plan["status"],
-            "effectiveDate": plan["effectiveDate"],
-        },
-        "copay": plan.get("copay") or {},
-    })
+    result = _verify_insurance_svc(member_id)
+    return _tool_result(result)
 
 
 # --- State ---
 
 
-class MessagesState(TypedDict):
+class MessagesState(TypedDict, total=False):
     """LangGraph state with message history. add_messages appends/merges new messages."""
 
     messages: Annotated[list, add_messages]
     debug_tool_calls: Annotated[list, operator.add]
+    patient_id: str
+    staff_id: str
 
 
 # --- Model setup ---
@@ -377,6 +251,8 @@ You help with:
 - Booking, modifying, or canceling appointments (patient's own only)
 - General health information (non-recommendation, educational only)
 
+Clinic location: When a patient asks "where is my clinic" or "where are my appointments", use get_my_appointment_locations with the patient_id from context to show locations of their upcoming appointments. If no patient_id in context, use get_patient_appointments only when the patient provides their ID.
+
 Rules:
 - Never diagnose, recommend treatments, or give medical advice
 - For urgent symptoms (chest pain, difficulty breathing, etc.), always say: "This may be an emergency. Please call 911 or go to the nearest ER immediately."
@@ -392,6 +268,7 @@ def _build_patient_agent():
     tools = [
         get_clinic_info,
         get_appointment_availability,
+        get_my_appointment_locations,
         list_providers,
         get_patient_appointments,
         book_appointment,
@@ -401,7 +278,11 @@ def _build_patient_agent():
     model_with_tools = model.bind_tools(tools)
 
     def llm_node(state: dict) -> dict:
-        msgs = [SystemMessage(content=PATIENT_SYSTEM_PROMPT)] + list(state["messages"])
+        prompt = PATIENT_SYSTEM_PROMPT
+        pid = state.get("patient_id")
+        if pid:
+            prompt += f"\n\nContext: The authenticated patient ID is {pid}. Use this patient_id when calling get_my_appointment_locations or get_patient_appointments for the patient's own data."
+        msgs = [SystemMessage(content=prompt)] + list(state["messages"])
         response = model_with_tools.invoke(msgs)
         return {"messages": [response]}
 
@@ -447,6 +328,8 @@ STAFF_SYSTEM_PROMPT = """You are a staff assistant for a healthcare clinic. You 
 - Medication order drafts (staged for provider sign-off)
 - Bloodwork review for triage
 
+Clinic location: When staff asks "where is the clinic" or "where is my clinic", use get_staff_assigned_clinic with the staff_id from context to show their assigned facility. If no staff_id in context, use get_clinic_info for generic clinic info.
+
 Rules:
 - Clinical recommendations must be drafts requiring clinician approval
 - Use tools for patient lookups, insurance verification
@@ -462,6 +345,7 @@ def _build_staff_agent():
     tools = [
         get_clinic_info,
         get_appointment_availability,
+        get_staff_assigned_clinic,
         list_providers,
         get_patient_appointments,
         list_upcoming_appointments,
@@ -474,7 +358,11 @@ def _build_staff_agent():
     model_with_tools = model.bind_tools(tools)
 
     def llm_node(state: dict) -> dict:
-        msgs = [SystemMessage(content=STAFF_SYSTEM_PROMPT)] + list(state["messages"])
+        prompt = STAFF_SYSTEM_PROMPT
+        sid = state.get("staff_id")
+        if sid:
+            prompt += f"\n\nContext: The authenticated staff ID is {sid}. Use this staff_id when calling get_staff_assigned_clinic for 'where is the clinic'."
+        msgs = [SystemMessage(content=prompt)] + list(state["messages"])
         response = model_with_tools.invoke(msgs)
         return {"messages": [response]}
 
@@ -524,7 +412,9 @@ def get_staff_agent():
 
 
 def invoke_patient_agent(
-    user_input: str, history: list[tuple[str, str]] | None = None
+    user_input: str,
+    history: list[tuple[str, str]] | None = None,
+    patient_id: str | None = None,
 ) -> tuple[str, list[dict] | None]:
     """Invoke patient agent and return (message, tool_calls or None)."""
     messages: list = []
@@ -537,7 +427,9 @@ def invoke_patient_agent(
     messages.append(HumanMessage(content=user_input))
 
     agent = get_patient_agent()
-    initial = {"messages": messages, "debug_tool_calls": []}
+    initial: dict = {"messages": messages, "debug_tool_calls": []}
+    if patient_id:
+        initial["patient_id"] = patient_id
     result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
@@ -546,7 +438,9 @@ def invoke_patient_agent(
 
 
 def invoke_staff_agent(
-    user_input: str, history: list[tuple[str, str]] | None = None
+    user_input: str,
+    history: list[tuple[str, str]] | None = None,
+    staff_id: str | None = None,
 ) -> tuple[str, list[dict] | None]:
     """Invoke staff agent and return (message, tool_calls or None)."""
     messages: list = []
@@ -559,7 +453,9 @@ def invoke_staff_agent(
     messages.append(HumanMessage(content=user_input))
 
     agent = get_staff_agent()
-    initial = {"messages": messages, "debug_tool_calls": []}
+    initial: dict = {"messages": messages, "debug_tool_calls": []}
+    if staff_id:
+        initial["staff_id"] = staff_id
     result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)

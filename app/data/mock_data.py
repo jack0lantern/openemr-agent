@@ -193,6 +193,37 @@ MOCK_AVAILABLE_SLOTS = [
     {"id": "slot-010", "date": "2025-02-28", "time": "10:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 20, "location": "Pediatrics Wing - Room 301", "type": "checkup"},
 ]
 
+# Staff users with assigned facilities (OpenEMR users.facility_id)
+MOCK_STAFF = [
+    {"id": "staff-001", "name": "Jane Receptionist", "facility_id": "fac-001"},
+    {"id": "staff-002", "name": "Bob Nurse", "facility_id": "fac-001"},
+    {"id": "staff-003", "name": "Alice Admin", "facility_id": "fac-002"},
+]
+
+# Facilities/clinics (OpenEMR facility table)
+MOCK_FACILITIES = [
+    {
+        "id": "fac-001",
+        "name": "Main Clinic",
+        "address": "123 Healthcare Ave, Suite 100",
+        "city": "Springfield",
+        "state": "IL",
+        "postal_code": "62701",
+        "phone": "555-0199",
+        "hours": "Mon–Fri 8am–5pm",
+    },
+    {
+        "id": "fac-002",
+        "name": "Eastside Clinic",
+        "address": "456 Medical Center Dr",
+        "city": "Springfield",
+        "state": "IL",
+        "postal_code": "62702",
+        "phone": "555-0200",
+        "hours": "Mon–Thu 9am–6pm",
+    },
+]
+
 MOCK_PATIENTS = [
     {"id": "pat-001", "name": "John Smith", "dateOfBirth": "1985-03-15", "phone": "(555) 101-2001", "email": "john.smith@email.com", "address": "123 Oak Street, Springfield", "insurancePlanId": "ins-001", "primaryCareProviderId": "prov-001", "emergencyContact": "Jane Smith", "emergencyContactPhone": "(555) 101-2002"},
     {"id": "pat-002", "name": "Maria Garcia", "dateOfBirth": "1992-07-22", "phone": "(555) 102-2002", "email": "maria.garcia@email.com", "address": "456 Elm Avenue, Riverside", "insurancePlanId": "ins-002", "primaryCareProviderId": "prov-002", "emergencyContact": "Carlos Garcia", "emergencyContactPhone": "(555) 102-2003"},

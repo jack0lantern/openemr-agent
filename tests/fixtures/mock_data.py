@@ -219,6 +219,25 @@ TEST_APPOINTMENTS = [
     },
 ]
 
+# Staff with assigned facilities (for get_staff_assigned_clinic)
+TEST_STAFF = [
+    {"id": "test-staff-001", "name": "Test Receptionist", "facility_id": "test-fac-001"},
+    {"id": "test-staff-002", "name": "Test Nurse", "facility_id": "test-fac-001"},
+]
+
+TEST_FACILITIES = [
+    {
+        "id": "test-fac-001",
+        "name": "Test Main Clinic",
+        "address": "123 Healthcare Ave, Suite 100",
+        "city": "Test City",
+        "state": "IL",
+        "postal_code": "62701",
+        "phone": "555-0199",
+        "hours": "Mon–Fri 8am–5pm",
+    },
+]
+
 # Slots on 2026-03-02 and 2026-03-03. 2026-03-01 has no slots (edge case).
 TEST_AVAILABLE_SLOTS = [
     {

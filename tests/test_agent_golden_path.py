@@ -12,6 +12,7 @@ Extended tests live in test_agent_eval.py.
 
 import pytest
 
+from app.llm.agent import invoke_patient_agent, invoke_staff_agent
 from tests.agent_batch import batch_invoke_patient_agent, batch_invoke_staff_agent
 
 from .conftest import requires_api_key
@@ -193,3 +194,39 @@ def test_batch_staff_summary_insurance_upcoming(
     msg4, tc4 = results[4]
     assert_tool_was_called(tc4, "list_upcoming_appointments")
     assert_response_contains_any(msg4, ["appointment", "test patient", "2025-02-24", "dr."])
+
+
+# --- Patient: where is my clinic (appointment locations) ---
+
+
+@requires_api_key
+@pytest.mark.timeout(60)
+def test_patient_where_is_my_clinic(enable_debug_tool_calls, set_anthropic_api_key):
+    """Patient with patient_id asks 'where is my clinic' → get_my_appointment_locations."""
+    message, tool_calls = invoke_patient_agent(
+        "Where is my clinic?",
+        patient_id="test-pat-001",
+    )
+    assert_tool_was_called(tool_calls, "get_my_appointment_locations")
+    assert_response_contains_any(
+        message,
+        ["main clinic", "room 101", "room 205", "room 301", "2025-02-24", "location"],
+    )
+
+
+# --- Staff: where is the clinic (assigned facility) ---
+
+
+@requires_api_key
+@pytest.mark.timeout(60)
+def test_staff_where_is_the_clinic(enable_debug_tool_calls, set_anthropic_api_key):
+    """Staff with staff_id asks 'where is the clinic' → get_staff_assigned_clinic."""
+    message, tool_calls = invoke_staff_agent(
+        "Where is the clinic?",
+        staff_id="test-staff-001",
+    )
+    assert_tool_was_called(tool_calls, "get_staff_assigned_clinic")
+    assert_response_contains_any(
+        message,
+        ["test main clinic", "123 healthcare", "555-0199", "address", "hours"],
+    )
