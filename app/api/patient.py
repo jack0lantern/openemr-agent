@@ -7,13 +7,17 @@ to the authenticated patient (no "God Mode" API key).
 """
 
 import asyncio
-import os  # AI-generated
+import os
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db import get_db_optional
+from app.db.crud import append_messages, create_conversation, get_conversation_with_messages
 from app.llm.agent import invoke_patient_agent
-from app.schemas import ChatRequest, ChatResponse
+from app.schemas import ChatRequest, ChatResponse, ToolCallDebug
 from app.telemetry import get_tracer
 
 router = APIRouter(prefix="/api/chat", tags=["patient"])
@@ -35,10 +39,18 @@ def _build_history(messages: list) -> list[tuple[str, str]]:
     return history
 
 
+def _tool_calls_to_json(tool_calls: list[ToolCallDebug] | list[dict] | None) -> list[dict] | None:
+    """Serialize tool calls for DB storage. Accepts ToolCallDebug models or plain dicts from the agent."""
+    if not tool_calls:
+        return None
+    return [tc if isinstance(tc, dict) else tc.model_dump() for tc in tool_calls]
+
+
 @router.post("/patient", response_model=ChatResponse)
 async def patient_chat(
     body: ChatRequest,
     token: str | None = Depends(_get_patient_token),
+    session: AsyncSession | None = Depends(get_db_optional),
 ) -> ChatResponse:
     """
     Patient-facing chat endpoint. When patient_auth_required=True, requires OAuth token
@@ -65,23 +77,65 @@ async def patient_chat(
         span.set_attribute("message.length", len(user_input))
 
         try:
-            if not os.getenv("ANTHROPIC_API_KEY", ""):  # AI-generated
+            patient_id = body.patient_id if body.patient_id is not None else os.getenv("DEFAULT_PATIENT_ID")
+            user_id = patient_id or "unknown"
+
+            if not os.getenv("ANTHROPIC_API_KEY", ""):
                 return ChatResponse(
                     message=f"I'm your patient assistant. You asked: \"{user_input}\"\n\n"
                     "LLM integration requires ANTHROPIC_API_KEY. Please call the front desk at "
-                    f"{os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."  # AI-generated
+                    f"{os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."
                 )
-            history = _build_history(body.messages)
-            patient_id = body.patient_id if body.patient_id is not None else os.getenv("DEFAULT_PATIENT_ID")  # AI-generated
+
+            history: list[tuple[str, str]]
+            conversation_id: uuid.UUID | None = None
+
+            if session and body.conversation_id:
+                try:
+                    cid = uuid.UUID(body.conversation_id)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Invalid conversation_id")
+                conv = await get_conversation_with_messages(session, cid)
+                if conv is None:
+                    raise HTTPException(status_code=404, detail="Conversation not found")
+                if conv.user_type != "patient" or conv.user_id != user_id:
+                    raise HTTPException(status_code=404, detail="Conversation not found")
+                conversation_id = conv.id
+                history = [(m.role, m.content) for m in conv.messages]
+            else:
+                history = _build_history(body.messages)
+
             message, tool_calls = await asyncio.to_thread(
                 invoke_patient_agent,
                 user_input,
                 history=history if history else None,
                 patient_id=patient_id,
             )
-            return ChatResponse(message=message, tool_calls=tool_calls)
+
+            if session:
+                if conversation_id is None:
+                    title = (user_input[:60] + "…") if len(user_input) > 60 else user_input
+                    conv = await create_conversation(session, "patient", user_id, title)
+                    conversation_id = conv.id
+
+                await append_messages(
+                    session,
+                    conversation_id,
+                    [
+                        ("user", user_input, None),
+                        ("assistant", message, _tool_calls_to_json(tool_calls)),
+                    ],
+                )
+
+            return ChatResponse(
+                message=message,
+                tool_calls=tool_calls,
+                conversation_id=str(conversation_id) if conversation_id else None,
+            )
+        except HTTPException:
+            raise
         except Exception as e:
             span.record_exception(e)
             return ChatResponse(
-                message=f"Sorry, I couldn't process your request. Please call the front desk at {os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."  # AI-generated
+                message=f"Sorry, I couldn't process your request. Please call the front desk at {os.getenv('ESCALATION_PHONE', '555-0199')} for assistance."
             )

@@ -13,6 +13,11 @@ langchain-anthropic>=0.3.0
 langchain-core>=0.3.0
 langsmith>=0.1.0
 
+# Database (conversation persistence)
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+alembic>=1.13.0
+
 # Telemetry (PRD §6.2 - Datadog/CloudWatch compatible)
 opentelemetry-api>=1.27.0
 opentelemetry-sdk>=1.27.0

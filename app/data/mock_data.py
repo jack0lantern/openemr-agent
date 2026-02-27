@@ -160,7 +160,7 @@ MOCK_APPOINTMENTS = [
         "time": "11:00 AM",
         "duration": 30,
         "type": "telehealth",
-        "status": "scheduled",
+        "status": "cancelled",
         "location": "Video Visit",
         "notes": "Medication review",
     },
@@ -178,6 +178,27 @@ MOCK_APPOINTMENTS = [
         "location": "Main Clinic - Procedure Room",
         "notes": "Colonoscopy screening",
     },
+    # March 2026 booked appointments (70% of March slots)
+    {"id": "apt-006", "patientName": "Maria Garcia", "patientId": "pat-002", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-01", "time": "10:00 AM", "duration": 45, "type": "new-patient", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-007", "patientName": "David Kim", "patientId": "pat-003", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "date": "2026-03-02", "time": "9:00 AM", "duration": 20, "type": "checkup", "status": "scheduled", "location": "Pediatrics Wing - Room 301"},
+    {"id": "apt-008", "patientName": "John Smith", "patientId": "pat-001", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-03", "time": "8:30 AM", "duration": 30, "type": "follow-up", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-009", "patientName": "Sarah Johnson", "patientId": "pat-004", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "date": "2026-03-03", "time": "11:00 AM", "duration": 30, "type": "follow-up", "status": "confirmed", "location": "Pediatrics Wing - Room 301"},
+    {"id": "apt-010", "patientName": "Emily Chen", "patientId": "pat-006", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-04", "time": "9:00 AM", "duration": 45, "type": "new-patient", "status": "scheduled", "location": "Main Clinic - Room 101"},
+    {"id": "apt-011", "patientName": "Michael O'Brien", "patientId": "pat-007", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-04", "time": "1:00 PM", "duration": 30, "type": "checkup", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-012", "patientName": "Aisha Patel", "patientId": "pat-008", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-05", "time": "3:00 PM", "duration": 30, "type": "telehealth", "status": "scheduled", "location": "Video Visit"},
+    {"id": "apt-013", "patientName": "Christopher Lee", "patientId": "pat-009", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-06", "time": "8:00 AM", "duration": 45, "type": "new-patient", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-014", "patientName": "Jennifer Martinez", "patientId": "pat-010", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-06", "time": "11:00 AM", "duration": 30, "type": "follow-up", "status": "scheduled", "location": "Main Clinic - Room 101"},
+    {"id": "apt-015", "patientName": "Robert Williams", "patientId": "pat-005", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-07", "time": "2:00 PM", "duration": 30, "type": "telehealth", "status": "scheduled", "location": "Video Visit"},
+    {"id": "apt-016", "patientName": "John Smith", "patientId": "pat-001", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-08", "time": "8:30 AM", "duration": 30, "type": "checkup", "status": "scheduled", "location": "Main Clinic - Room 101"},
+    {"id": "apt-017", "patientName": "Maria Garcia", "patientId": "pat-002", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "date": "2026-03-08", "time": "10:00 AM", "duration": 20, "type": "checkup", "status": "scheduled", "location": "Pediatrics Wing - Room 301"},
+    {"id": "apt-018", "patientName": "David Kim", "patientId": "pat-003", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-09", "time": "9:00 AM", "duration": 45, "type": "new-patient", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-019", "patientName": "Sarah Johnson", "patientId": "pat-004", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-09", "time": "1:00 PM", "duration": 30, "type": "follow-up", "status": "scheduled", "location": "Main Clinic - Room 101"},
+    {"id": "apt-020", "patientName": "Emily Chen", "patientId": "pat-006", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-10", "time": "3:00 PM", "duration": 30, "type": "checkup", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-021", "patientName": "Michael O'Brien", "patientId": "pat-007", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "date": "2026-03-11", "time": "11:00 AM", "duration": 20, "type": "checkup", "status": "scheduled", "location": "Pediatrics Wing - Room 301"},
+    {"id": "apt-022", "patientName": "Aisha Patel", "patientId": "pat-008", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-12", "time": "9:00 AM", "duration": 45, "type": "new-patient", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-023", "patientName": "Christopher Lee", "patientId": "pat-009", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "date": "2026-03-12", "time": "2:00 PM", "duration": 30, "type": "telehealth", "status": "scheduled", "location": "Video Visit"},
+    {"id": "apt-024", "patientName": "Jennifer Martinez", "patientId": "pat-010", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "date": "2026-03-13", "time": "10:00 AM", "duration": 30, "type": "checkup", "status": "scheduled", "location": "Main Clinic - Room 205"},
+    {"id": "apt-025", "patientName": "Robert Williams", "patientId": "pat-005", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "date": "2026-03-14", "time": "1:00 PM", "duration": 20, "type": "checkup", "status": "scheduled", "location": "Pediatrics Wing - Room 301"},
 ]
 
 MOCK_AVAILABLE_SLOTS = [
@@ -191,6 +212,22 @@ MOCK_AVAILABLE_SLOTS = [
     {"id": "slot-008", "date": "2025-02-27", "time": "9:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 60, "location": "Main Clinic - Procedure Room", "type": "procedure"},
     {"id": "slot-009", "date": "2025-02-27", "time": "3:00 PM", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "duration": 30, "location": "Video Visit", "type": "telehealth"},
     {"id": "slot-010", "date": "2025-02-28", "time": "10:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 20, "location": "Pediatrics Wing - Room 301", "type": "checkup"},
+    # Freed slots (cancelled appointments) + 2025-02-24
+    {"id": "slot-039", "date": "2025-02-25", "time": "11:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Video Visit", "type": "telehealth"},
+    {"id": "slot-040", "date": "2025-02-24", "time": "8:30 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Main Clinic - Room 101", "type": "checkup"},
+    {"id": "slot-041", "date": "2025-02-24", "time": "1:00 PM", "providerId": "prov-002", "providerName": "Dr. Michael Torres", "duration": 45, "location": "Main Clinic - Room 205", "type": "new-patient"},
+    {"id": "slot-042", "date": "2025-02-24", "time": "3:30 PM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 20, "location": "Pediatrics Wing - Room 301", "type": "checkup"},
+    {"id": "slot-043", "date": "2025-02-23", "time": "9:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Main Clinic - Room 101", "type": "follow-up"},
+    {"id": "slot-044", "date": "2025-02-23", "time": "11:00 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 30, "location": "Pediatrics Wing - Room 301", "type": "checkup"},
+    # March 1-14, 2026 (30% free = 8 slots; 70% booked = 20 appointments)
+    {"id": "slot-011", "date": "2026-03-01", "time": "8:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Main Clinic - Room 101", "type": "checkup"},
+    {"id": "slot-014", "date": "2026-03-02", "time": "2:00 PM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Video Visit", "type": "telehealth"},
+    {"id": "slot-019", "date": "2026-03-05", "time": "10:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 20, "location": "Pediatrics Wing - Room 301", "type": "checkup"},
+    {"id": "slot-023", "date": "2026-03-07", "time": "9:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 30, "location": "Pediatrics Wing - Room 301", "type": "follow-up"},
+    {"id": "slot-029", "date": "2026-03-10", "time": "10:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 30, "location": "Pediatrics Wing - Room 301", "type": "follow-up"},
+    {"id": "slot-031", "date": "2026-03-11", "time": "8:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 30, "location": "Main Clinic - Room 101", "type": "checkup"},
+    {"id": "slot-035", "date": "2026-03-13", "time": "8:30 AM", "providerId": "prov-003", "providerName": "Dr. Emily Watson", "duration": 30, "location": "Pediatrics Wing - Room 301", "type": "follow-up"},
+    {"id": "slot-037", "date": "2026-03-14", "time": "9:00 AM", "providerId": "prov-001", "providerName": "Dr. Sarah Chen", "duration": 45, "location": "Main Clinic - Room 101", "type": "new-patient"},
 ]
 
 # Staff users with assigned facilities (OpenEMR users.facility_id)

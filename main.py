@@ -11,15 +11,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.conversations import router as conversations_router
 from app.api.oauth import router as oauth_router
 from app.api.patient import router as patient_router
 from app.api.staff import router as staff_router
+from app.db import init_db
 from app.langsmith_client import flush_langsmith
 from app.telemetry import setup_telemetry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_db()
     yield
     flush_langsmith()
 
@@ -42,6 +45,7 @@ app.add_middleware(
 app.include_router(oauth_router)
 app.include_router(patient_router)
 app.include_router(staff_router)
+app.include_router(conversations_router)
 
 # Setup OpenTelemetry (PRD §6.2 - Datadog/CloudWatch compatible)
 setup_telemetry(app)
