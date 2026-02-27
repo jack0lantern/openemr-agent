@@ -13,6 +13,19 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env so ANTHROPIC_API_KEY is available for integration tests
 
+# Use SQLite in-memory instead of PostgreSQL for tests (no external DB required)
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def ensure_db_tables():
+    """Create DB tables before tests that use the database (runs before client fixture)."""
+    import asyncio
+
+    from app.db import init_db
+
+    asyncio.run(init_db())
+
 # Skip integration tests if no API key (from .env or environment)
 requires_api_key = pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"),

@@ -3,6 +3,7 @@
 import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.db.models import Base
 
@@ -16,11 +17,16 @@ def _get_database_url() -> str | None:
     return url
 
 
+def _is_sqlite(url: str) -> bool:
+    return "sqlite" in url
+
+
 _url = _get_database_url()
 engine = (
     create_async_engine(
         _url,
         echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+        poolclass=StaticPool if _url and _is_sqlite(_url) else None,
     )
     if _url
     else None
