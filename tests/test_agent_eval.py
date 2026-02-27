@@ -85,7 +85,7 @@ def test_eval_patient_internal_medicine_doctor(enable_debug_tool_calls, set_anth
 def test_eval_patient_fluid_overload_edema_source_verification(
     enable_debug_tool_calls, set_anthropic_api_key
 ):
-    """User asks about fluid overload and edema; verify agent response is grounded in source."""
+    """Source test: user asks about edema; verify agent response is grounded in source."""
     query = "What could cause edema?"
     message, tool_calls, _, _ = invoke_patient_agent(query)
 
