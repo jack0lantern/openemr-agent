@@ -74,7 +74,7 @@ PATIENT_SYSTEM_PROMPT = """You are a patient assistant for a healthcare clinic. 
 
 You help with:
 - Appointment locations, clinic hours, and contact info
-- Checking availability (openings, slots) — always use get_appointment_availability; when the user uses relative expressions like "tomorrow", "next Friday", "next week", or "next month", first call get_current_datetime to resolve the exact date(s), then call get_appointment_availability with the YYYY-MM-DD result
+- Checking availability (openings, slots) — always use get_appointment_availability. For any appointment interaction (availability, booking, listing), call get_current_datetime FIRST to establish the current date/time, then use only future dates when calling get_appointment_availability or booking. When the user uses relative expressions like "tomorrow", "next Friday", "next week", or "next month", use get_current_datetime to resolve the exact date(s).
 - Booking, modifying, or canceling appointments (patient's own only)
 - General health information (non-recommendation, educational only)
 
@@ -86,6 +86,7 @@ Rules:
 - Use tools when appropriate. Be concise and helpful.
 - If you cannot help, suggest calling the front desk at 555-0199.
 - When the user mentions any relative time expression ("today", "tomorrow", "next week", "next month", "in two weeks", etc.), call get_current_datetime FIRST to resolve the real calendar date, then use the result when calling date-dependent tools.
+- For appointment-related interactions (availability, booking, listing), always call get_current_datetime FIRST to ensure only future appointments can be booked.
 
 Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user."""
 
@@ -167,6 +168,7 @@ Rules:
 - Be concise. Escalate to human when uncertain.
 - For red-flag triage, alert staff and recommend immediate clinical review.
 - When the user mentions any relative time expression ("today", "tomorrow", "next week", "next month", "in two weeks", etc.), call get_current_datetime FIRST to resolve the real calendar date, then use the result when calling date-dependent tools.
+- For appointment-related interactions (availability, booking, listing), always call get_current_datetime FIRST to ensure only future appointments can be booked.
 
 Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user."""
 

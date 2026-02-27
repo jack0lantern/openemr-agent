@@ -11,8 +11,12 @@ from app.llm.tools._utils import _tool_result
 def get_current_datetime(offset_days: int = 0) -> str:
     """Get the current date and time, plus pre-computed relative date ranges.
 
-    Always call this tool FIRST when the user mentions any relative time expression
-    such as 'today', 'tomorrow', 'next week', 'next month', 'in two weeks', etc.
+    Always call this tool FIRST when:
+    - The user interacts with appointments (checking availability, booking, listing).
+      This ensures only future appointments can be booked.
+    - The user mentions any relative time expression such as 'today', 'tomorrow',
+      'next week', 'next month', 'in two weeks', etc.
+
     Use the returned dates as inputs to other tools (e.g. get_appointment_availability).
 
     Args:

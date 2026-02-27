@@ -407,10 +407,10 @@ def get_available_dates() -> list[str]:
 
 
 def get_available_slots(date_str: str) -> list[dict]:
-    """Get available appointment slots for a date. date_str in YYYY-MM-DD."""
+    """Get available appointment slots for a date. date_str in YYYY-MM-DD. Only returns future slots."""
     if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
-        return [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date_str]
-
+        matching = [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date_str]
+        return [s for s in matching if not _is_slot_in_past(s)]
     # OpenEMR does not support FHIR Slot resources.
     return []
 
@@ -447,6 +447,18 @@ def _time_sort_key(time_str: str) -> tuple[int, int]:
         return (parsed.hour, parsed.minute)
     except (ValueError, TypeError):
         return (0, 0)
+
+
+def _is_slot_in_past(slot: dict) -> bool:
+    """Return True if slot date+time is in the past. Only future appointments can be booked."""
+    try:
+        slot_dt = datetime.strptime(
+            f"{slot.get('date', '')} {slot.get('time', '')}",
+            "%Y-%m-%d %I:%M %p",
+        )
+        return slot_dt <= datetime.now()
+    except (ValueError, TypeError):
+        return True  # Treat unparseable as past to be safe
 
 
 def get_upcoming_appointments(today: str | None = None) -> list[dict]:
@@ -488,6 +500,12 @@ def book_appointment(patient_id: str, slot_id: str) -> dict:
                 "success": False,
                 "error": f"Slot {slot_id} not found",
                 "suggestion": "Use get_appointment_availability to see available slots",
+            }
+        if _is_slot_in_past(slot):
+            return {
+                "success": False,
+                "error": "Only future appointments can be booked. This slot is in the past.",
+                "suggestion": "Call get_current_datetime first, then get_appointment_availability for future dates.",
             }
         patient = next((p for p in MOCK_PATIENTS if p["id"] == patient_id), None)
         if not patient:

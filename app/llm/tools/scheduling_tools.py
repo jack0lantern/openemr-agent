@@ -14,7 +14,7 @@ from app.services.data_service import (
 
 @tool
 def get_appointment_availability(date: str) -> str:
-    """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') and pass YYYY-MM-DD format (e.g. 2025-02-25)."""
+    """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Call get_current_datetime FIRST to establish the current date, then pass only future dates in YYYY-MM-DD format. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') using get_current_datetime's relative_ranges."""
     slots = get_available_slots(date)
     available_dates = sorted({s["date"] for s in slots}) if slots else get_available_dates()
     if not slots:
@@ -90,6 +90,6 @@ def list_upcoming_appointments() -> str:
 
 @tool
 def book_appointment(patient_id: str, slot_id: str) -> str:
-    """Book an appointment for a patient using an available slot ID (e.g. slot-001). Returns confirmation."""
+    """Book an appointment for a patient using an available slot ID (e.g. slot-001). Call get_current_datetime FIRST to ensure the slot is in the future. Returns confirmation."""
     result = _book_appointment_svc(patient_id, slot_id)
     return _tool_result(result)

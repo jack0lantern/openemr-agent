@@ -199,6 +199,28 @@ def test_book_appointment_invalid_patient_valid_slot_returns_error():
     assert "error" in data
 
 
+def test_book_appointment_past_slot_returns_error(monkeypatch):
+    """Only future appointments can be booked; past slots are rejected."""
+    past_slots = [
+        {
+            "id": "past-slot-001",
+            "date": "2020-01-01",
+            "time": "9:00 AM",
+            "providerId": "test-prov-001",
+            "providerName": "Dr. Test Provider",
+            "duration": 30,
+            "location": "Main Clinic",
+            "type": "checkup",
+        }
+    ]
+    monkeypatch.setattr("app.services.data_service.MOCK_AVAILABLE_SLOTS", past_slots)
+    result = book_appointment.invoke({"patient_id": "test-pat-001", "slot_id": "past-slot-001"})
+    data = _parse_tool_result(result)
+    assert data["success"] is False
+    assert "past" in data["error"].lower() or "future" in data["error"].lower()
+    assert "get_current_datetime" in data.get("suggestion", "").lower()
+
+
 # --- Tool 6: search_medical_info ---
 
 

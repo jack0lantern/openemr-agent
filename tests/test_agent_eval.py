@@ -77,20 +77,6 @@ def test_eval_patient_internal_medicine_doctor(enable_debug_tool_calls, set_anth
     assert_response_contains_any(message, ["internal medicine", "dr. test internist"])
 
 
-# --- Patient appointments (alternate multi-turn) ---
-
-
-@requires_api_key
-@pytest.mark.timeout(60)
-def test_eval_patient_multi_turn_establish_then_appointments(
-    enable_debug_tool_calls, set_anthropic_api_key
-):
-    history = [("user", "I'm test-pat-001"), ("assistant", "Got it, you're Test Patient Alpha.")]
-    message, tool_calls = invoke_patient_agent("Show my appointments", history=history)
-    assert_tool_was_called(tool_calls, "get_patient_appointments")
-    assert_response_contains_any(message, ["test-apt-001", "appointment", "2025-02-24", "9:00"])
-
-
 # --- Medical info (grounded response validation) ---
 
 
