@@ -24,10 +24,20 @@ class ToolCallDebug(BaseModel):
     output: str
 
 
+class TokenUsage(BaseModel):
+    """Token usage and optional cost per request."""
+
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cost_usd: float | None = None
+
+
 class ChatResponse(BaseModel):
     message: str
     tool_calls: list[ToolCallDebug] | None = None
     conversation_id: str | None = None
+    token_usage: TokenUsage | None = None
 
 
 class ConversationSummary(BaseModel):

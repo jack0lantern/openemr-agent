@@ -44,7 +44,7 @@ def assert_graceful_decline_or_redirect(response: str, topic_hints: list[str]) -
 @pytest.mark.timeout(60)
 def test_untooled_outstanding_balance(enable_debug_tool_calls, set_anthropic_api_key):
     """Billing: What's my outstanding balance? - no tool, graceful decline."""
-    message, tool_calls = invoke_patient_agent("What's my outstanding balance?")
+    message, tool_calls, _ = invoke_patient_agent("What's my outstanding balance?")
     assert_graceful_decline_or_redirect(message, ["balance", "billing"])
 
 
@@ -52,7 +52,7 @@ def test_untooled_outstanding_balance(enable_debug_tool_calls, set_anthropic_api
 @pytest.mark.timeout(60)
 def test_untooled_pay_bill_online(enable_debug_tool_calls, set_anthropic_api_key):
     """Billing: Can I pay my bill online? - no tool."""
-    message, _ = invoke_patient_agent("Can I pay my bill online?")
+    message, _, _ = invoke_patient_agent("Can I pay my bill online?")
     assert_graceful_decline_or_redirect(message, ["pay", "bill"])
 
 
@@ -63,7 +63,7 @@ def test_untooled_pay_bill_online(enable_debug_tool_calls, set_anthropic_api_key
 @pytest.mark.timeout(60)
 def test_untooled_patient_medications(enable_debug_tool_calls, set_anthropic_api_key):
     """Medication: What medications is patient taking? - no tool."""
-    message, _ = invoke_staff_agent("What medications is patient test-pat-001 currently taking?")
+    message, _, _ = invoke_staff_agent("What medications is patient test-pat-001 currently taking?")
     assert_graceful_decline_or_redirect(message, ["medication"])
 
 
@@ -74,7 +74,7 @@ def test_untooled_patient_medications(enable_debug_tool_calls, set_anthropic_api
 @pytest.mark.timeout(60)
 def test_untooled_lab_results(enable_debug_tool_calls, set_anthropic_api_key):
     """Lab: Show me lab results - no tool."""
-    message, _ = invoke_staff_agent("Show me the latest lab results for patient test-pat-001")
+    message, _, _ = invoke_staff_agent("Show me the latest lab results for patient test-pat-001")
     assert_graceful_decline_or_redirect(message, ["lab"])
 
 
@@ -86,7 +86,7 @@ def test_untooled_lab_results(enable_debug_tool_calls, set_anthropic_api_key):
 def test_untooled_cancel_appointment(enable_debug_tool_calls, set_anthropic_api_key):
     """Appointment: Cancel my appointment - no cancel tool."""
     history = [("user", "I'm test-pat-001"), ("assistant", "Got it.")]
-    message, _ = invoke_patient_agent("Cancel my appointment on March 2nd", history=history)
+    message, _, _ = invoke_patient_agent("Cancel my appointment on March 2nd", history=history)
     assert_graceful_decline_or_redirect(message, ["cancel", "appointment"])
 
 
@@ -97,5 +97,5 @@ def test_untooled_cancel_appointment(enable_debug_tool_calls, set_anthropic_api_
 @pytest.mark.timeout(60)
 def test_untooled_referral(enable_debug_tool_calls, set_anthropic_api_key):
     """Referral: I need a referral - no tool."""
-    message, _ = invoke_patient_agent("I need a referral to a dermatologist")
+    message, _, _ = invoke_patient_agent("I need a referral to a dermatologist")
     assert_graceful_decline_or_redirect(message, ["referral"])

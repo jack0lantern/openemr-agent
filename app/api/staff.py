@@ -16,8 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.db.crud import append_messages, create_conversation, get_conversation_with_messages
 from app.llm.agent import invoke_staff_agent
-from app.schemas import ChatRequest, ChatResponse, ToolCallDebug
+from app.llm.cost import compute_cost_usd
+from app.schemas import ChatRequest, ChatResponse, TokenUsage, ToolCallDebug
 from app.telemetry import get_tracer
+
+MODEL_NAME = "claude-haiku-4-5"
 
 router = APIRouter(prefix="/api/chat", tags=["staff"])
 security = HTTPBearer(auto_error=False)
@@ -105,12 +108,32 @@ async def staff_chat(
             else:
                 history = _build_history(body.messages)
 
-            message, tool_calls = await asyncio.to_thread(
+            message, tool_calls, usage = await asyncio.to_thread(
                 invoke_staff_agent,
                 user_input,
                 history=history if history else None,
                 staff_id=staff_id,
             )
+
+            token_usage: TokenUsage | None = None
+            if usage is not None:
+                cost_usd = (
+                    compute_cost_usd(
+                        usage["input_tokens"],
+                        usage["output_tokens"],
+                        model=MODEL_NAME,
+                    )
+                    if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true"
+                    else None
+                )
+                token_usage = TokenUsage(
+                    input_tokens=usage["input_tokens"],
+                    output_tokens=usage["output_tokens"],
+                    total_tokens=usage["total_tokens"],
+                    cost_usd=cost_usd,
+                )
+                span.set_attribute("llm.token_count.prompt", usage["input_tokens"])
+                span.set_attribute("llm.token_count.completion", usage["output_tokens"])
 
             if conversation_id is None:
                 title = (user_input[:60] + "…") if len(user_input) > 60 else user_input
@@ -130,6 +153,7 @@ async def staff_chat(
                 message=message,
                 tool_calls=tool_calls,
                 conversation_id=str(conversation_id),
+                token_usage=token_usage,
             )
         except HTTPException:
             raise

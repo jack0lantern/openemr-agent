@@ -28,14 +28,28 @@ def _messages_from_request(
 
 
 def batch_invoke_patient_agent(
-    requests: list[tuple[str, list[tuple[str, str]] | None]],
+    requests: list[
+        tuple[str, list[tuple[str, str]] | None]
+        | tuple[str, list[tuple[str, str]] | None, dict]
+    ],
 ) -> list[tuple[str, list[dict] | None]]:
-    """Run multiple patient agent invocations in parallel via batch."""
+    """Run multiple patient agent invocations in parallel via batch.
+
+    Each request is (user_input, history) or (user_input, history, {"patient_id": "..."}).
+    """
     agent = get_patient_agent()
-    initials = [
-        {"messages": _messages_from_request(user_input, history), "debug_tool_calls": []}
-        for user_input, history in requests
-    ]
+    initials = []
+    for item in requests:
+        user_input = item[0]
+        history = item[1]
+        extra = item[2] if len(item) >= 3 and item[2] else {}
+        initial: dict = {
+            "messages": _messages_from_request(user_input, history),
+            "debug_tool_calls": [],
+        }
+        if extra.get("patient_id"):
+            initial["patient_id"] = extra["patient_id"]
+        initials.append(initial)
     results = agent.batch(initials)
     outputs = []
     for result in results:
@@ -47,14 +61,28 @@ def batch_invoke_patient_agent(
 
 
 def batch_invoke_staff_agent(
-    requests: list[tuple[str, list[tuple[str, str]] | None]],
+    requests: list[
+        tuple[str, list[tuple[str, str]] | None]
+        | tuple[str, list[tuple[str, str]] | None, dict]
+    ],
 ) -> list[tuple[str, list[dict] | None]]:
-    """Run multiple staff agent invocations in parallel via batch."""
+    """Run multiple staff agent invocations in parallel via batch.
+
+    Each request is (user_input, history) or (user_input, history, {"staff_id": "..."}).
+    """
     agent = get_staff_agent()
-    initials = [
-        {"messages": _messages_from_request(user_input, history), "debug_tool_calls": []}
-        for user_input, history in requests
-    ]
+    initials = []
+    for item in requests:
+        user_input = item[0]
+        history = item[1]
+        extra = item[2] if len(item) >= 3 and item[2] else {}
+        initial: dict = {
+            "messages": _messages_from_request(user_input, history),
+            "debug_tool_calls": [],
+        }
+        if extra.get("staff_id"):
+            initial["staff_id"] = extra["staff_id"]
+        initials.append(initial)
     results = agent.batch(initials)
     outputs = []
     for result in results:

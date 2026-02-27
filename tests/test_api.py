@@ -42,7 +42,7 @@ def test_api_02_root_returns_service_info(client, disable_auth):
 
 
 def test_api_03_patient_valid_request_returns_200(client, disable_auth):
-    """API-03: POST /api/chat/patient valid request returns 200 with message field."""
+    """API-03: POST /api/chat/patient valid request returns 200 with message and token_usage."""
     response = client.post(
         "/api/chat/patient",
         json={"messages": [{"role": "user", "content": "What are your hours?"}]},
@@ -50,6 +50,12 @@ def test_api_03_patient_valid_request_returns_200(client, disable_auth):
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
+    assert "token_usage" in data
+    if data["token_usage"] is not None:
+        tu = data["token_usage"]
+        assert "input_tokens" in tu
+        assert "output_tokens" in tu
+        assert "total_tokens" in tu
 
 
 def test_api_04_patient_missing_auth_when_required_returns_401(client, monkeypatch):
@@ -90,7 +96,7 @@ def test_api_06_patient_last_message_not_user_returns_400(client, disable_auth):
 
 
 def test_api_07_staff_valid_request_returns_200(client, disable_auth):
-    """API-07: POST /api/chat/staff valid request returns 200 with message field."""
+    """API-07: POST /api/chat/staff valid request returns 200 with message and token_usage."""
     response = client.post(
         "/api/chat/staff",
         json={"messages": [{"role": "user", "content": "What appointments are coming up?"}]},
@@ -98,6 +104,12 @@ def test_api_07_staff_valid_request_returns_200(client, disable_auth):
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
+    assert "token_usage" in data
+    if data["token_usage"] is not None:
+        tu = data["token_usage"]
+        assert "input_tokens" in tu
+        assert "output_tokens" in tu
+        assert "total_tokens" in tu
 
 
 def test_api_08_staff_missing_auth_when_required_returns_401(client, monkeypatch):

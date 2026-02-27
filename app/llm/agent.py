@@ -242,6 +242,46 @@ def _build_staff_agent():
     return graph.compile()
 
 
+# --- Usage aggregation ---
+
+
+def _aggregate_usage(messages: list) -> dict | None:
+    """
+    Aggregate usage_metadata from all AIMessages in the result.
+    Returns {"input_tokens": int, "output_tokens": int, "total_tokens": int} or None.
+    """
+    total_input = 0
+    total_output = 0
+    total_total = 0
+    found = False
+    for msg in messages:
+        if not isinstance(msg, AIMessage):
+            continue
+        meta = getattr(msg, "usage_metadata", None) or (
+            getattr(msg, "response_metadata", None) or {}
+        ).get("usage")
+        if not meta or not isinstance(meta, dict):
+            continue
+        inp = meta.get("input_tokens") if meta.get("input_tokens") is not None else meta.get("input_token_count")
+        out = meta.get("output_tokens") if meta.get("output_tokens") is not None else meta.get("output_token_count")
+        tot = meta.get("total_tokens") if meta.get("total_tokens") is not None else meta.get("total_token_count")
+        if inp is not None:
+            total_input += int(inp)
+            found = True
+        if out is not None:
+            total_output += int(out)
+            found = True
+        if tot is not None:
+            total_total += int(tot)
+    if not found:
+        return None
+    return {
+        "input_tokens": total_input,
+        "output_tokens": total_output,
+        "total_tokens": total_total or total_input + total_output,
+    }
+
+
 # --- Public API (lazy init to avoid startup cost) ---
 
 
@@ -259,8 +299,8 @@ def invoke_patient_agent(
     user_input: str,
     history: list[tuple[str, str]] | None = None,
     patient_id: str | None = None,
-) -> tuple[str, list[dict] | None]:
-    """Invoke patient agent and return (message, tool_calls or None)."""
+) -> tuple[str, list[dict] | None, dict | None]:
+    """Invoke patient agent and return (message, tool_calls or None, usage or None)."""
     messages: list = []
     if history:
         for role, content in history:
@@ -278,15 +318,16 @@ def invoke_patient_agent(
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
-    return message, tool_calls
+    usage = _aggregate_usage(result["messages"])
+    return message, tool_calls, usage
 
 
 def invoke_staff_agent(
     user_input: str,
     history: list[tuple[str, str]] | None = None,
     staff_id: str | None = None,
-) -> tuple[str, list[dict] | None]:
-    """Invoke staff agent and return (message, tool_calls or None)."""
+) -> tuple[str, list[dict] | None, dict | None]:
+    """Invoke staff agent and return (message, tool_calls or None, usage or None)."""
     messages: list = []
     if history:
         for role, content in history:
@@ -304,4 +345,5 @@ def invoke_staff_agent(
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
-    return message, tool_calls
+    usage = _aggregate_usage(result["messages"])
+    return message, tool_calls, usage

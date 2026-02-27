@@ -44,7 +44,7 @@ def assert_tool_was_called(tool_calls: list[dict] | None, tool_name: str) -> Non
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_patient_pediatricians(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_patient_agent("Do you have any pediatricians?")
+    message, tool_calls, _ = invoke_patient_agent("Do you have any pediatricians?")
     assert_tool_was_called(tool_calls, "list_providers")
     assert_response_contains_any(message, ["pediatric", "dr. test pediatrician", "pediatrics"])
 
@@ -52,7 +52,7 @@ def test_eval_patient_pediatricians(enable_debug_tool_calls, set_anthropic_api_k
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_patient_clinic_location(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_patient_agent("Where is the clinic located?")
+    message, tool_calls, _ = invoke_patient_agent("Where is the clinic located?")
     assert_response_contains_any(message, ["address", "123", "healthcare", "parking"])
 
 
@@ -62,7 +62,7 @@ def test_eval_patient_clinic_location(enable_debug_tool_calls, set_anthropic_api
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_patient_availability_next_friday(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_patient_agent("Any openings next Friday?")
+    message, tool_calls, _ = invoke_patient_agent("Any openings next Friday?")
     assert_tool_was_called(tool_calls, "get_appointment_availability")
 
 
@@ -72,7 +72,7 @@ def test_eval_patient_availability_next_friday(enable_debug_tool_calls, set_anth
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_patient_internal_medicine_doctor(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_patient_agent("I need an internal medicine doctor")
+    message, tool_calls, _ = invoke_patient_agent("I need an internal medicine doctor")
     assert_tool_was_called(tool_calls, "list_providers")
     assert_response_contains_any(message, ["internal medicine", "dr. test internist"])
 
@@ -87,7 +87,7 @@ def test_eval_patient_medical_info_response_matches_mock_database(
 ):
     """Verify the agent's medical info response is grounded in the mock database."""
     query = "What could cause headache and nausea?"
-    message, tool_calls = invoke_patient_agent(query)
+    message, tool_calls, _ = invoke_patient_agent(query)
 
     assert_tool_was_called(tool_calls, "search_medical_info")
     output = _get_tool_output(tool_calls, "search_medical_info")
@@ -115,7 +115,7 @@ def test_eval_patient_medical_info_response_matches_mock_database(
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_staff_chart_no_insurance(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_staff_agent("Show me the chart for test-pat-003")
+    message, tool_calls, _ = invoke_staff_agent("Show me the chart for test-pat-003")
     assert_tool_was_called(tool_calls, "lookup_patient_summary")
     assert_response_contains_any(message, ["test patient no insurance", "no insurance", "insurance"])
 
@@ -126,5 +126,5 @@ def test_eval_staff_chart_no_insurance(enable_debug_tool_calls, set_anthropic_ap
 @requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_staff_todays_schedule(enable_debug_tool_calls, set_anthropic_api_key):
-    message, tool_calls = invoke_staff_agent("Show me today's schedule")
+    message, tool_calls, _ = invoke_staff_agent("Show me today's schedule")
     assert_tool_was_called(tool_calls, "list_upcoming_appointments")
