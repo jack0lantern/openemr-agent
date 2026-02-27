@@ -108,7 +108,7 @@ async def staff_chat(
             else:
                 history = _build_history(body.messages)
 
-            message, tool_calls, usage = await asyncio.to_thread(
+            message, tool_calls, usage, metadata = await asyncio.to_thread(
                 invoke_staff_agent,
                 user_input,
                 history=history if history else None,
@@ -154,6 +154,7 @@ async def staff_chat(
                 tool_calls=tool_calls,
                 conversation_id=str(conversation_id),
                 token_usage=token_usage,
+                metadata=metadata,
             )
         except HTTPException:
             raise

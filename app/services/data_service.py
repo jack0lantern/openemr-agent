@@ -15,6 +15,7 @@ from app.data.mock_data import (
     MOCK_PROVIDERS,
     MOCK_STAFF,
 )
+from app.data.mock_data import _CONDITION_URLS
 from app.services.fhir_client import FHIRRequestError, get_fhir_client
 
 
@@ -724,11 +725,18 @@ def search_conditions(symptoms: str) -> list[dict]:
         matches = []
         for cond in MOCK_MEDICAL_CONDITIONS:
             symptom_text = " ".join(cond.get("common_symptoms", [])).lower()
-            if any(term in symptom_text or term in cond["name"].lower() for term in query_terms):
+            matched_terms = sum(
+                1 for term in query_terms
+                if term in symptom_text or term in cond["name"].lower()
+            )
+            if matched_terms > 0:
+                match_score = matched_terms / max(len(query_terms), 1)
                 matches.append({
                     "name": cond["name"],
                     "description": cond["description"],
                     "common_symptoms": cond["common_symptoms"],
+                    "match_score": match_score,
+                    "url": cond.get("url"),
                 })
         return matches
 
@@ -736,15 +744,19 @@ def search_conditions(symptoms: str) -> list[dict]:
         client = get_fhir_client()
         bundle = await client.get_conditions(code_text=symptoms if symptoms else None)
         entries = bundle.get("entry", []) or []
-        return [
-            {
-                "name": _fhir_condition_to_condition(e.get("resource", {}))["name"],
+        result = []
+        for e in entries:
+            if e.get("resource", {}).get("resourceType") != "Condition":
+                continue
+            name = _fhir_condition_to_condition(e.get("resource", {}))["name"]
+            result.append({
+                "name": name,
                 "description": "",
                 "common_symptoms": [],
-            }
-            for e in entries
-            if e.get("resource", {}).get("resourceType") == "Condition"
-        ]
+                "match_score": 1.0,
+                "url": _CONDITION_URLS.get(name),
+            })
+        return result
 
     return _run_async(_fetch())
 

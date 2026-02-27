@@ -118,14 +118,14 @@ def test_ms_pat_check_availability_then_book(
     enable_debug_tool_calls, set_anthropic_api_key
 ):
     """PAT-MS-07: Check availability, then book specific slot across turns."""
-    msg1, _, _ = invoke_patient_agent(
+    msg1, _, _, _ = invoke_patient_agent(
         "What's available on 2026-03-02?",
         history=[
             ("user", "I'm test-pat-001"),
             ("assistant", "I have you as Test Patient Alpha."),
         ],
     )
-    message, tool_calls, _ = invoke_patient_agent(
+    message, tool_calls, _, _ = invoke_patient_agent(
         "Book me the 8:00 AM slot with Dr. Test Provider",
         history=[
             ("user", "I'm test-pat-001"),
@@ -147,8 +147,8 @@ def test_ms_pat_medical_info_then_appointment(
     enable_debug_tool_calls, set_anthropic_api_key
 ):
     """PAT-MS-08: Medical info question, then request to make appointment."""
-    msg1, _, _ = invoke_patient_agent("What could cause headache and nausea?")
-    message, tool_calls, _ = invoke_patient_agent(
+    msg1, _, _, _ = invoke_patient_agent("What could cause headache and nausea?")
+    message, tool_calls, _, _ = invoke_patient_agent(
         "Can I make an appointment?",
         history=[
             ("user", "What could cause headache and nausea?"),
@@ -243,10 +243,10 @@ def test_ms_stf_schedule_and_first_patient_chart(
     enable_debug_tool_calls, set_anthropic_api_key
 ):
     """STF-MS-04: Show schedule, then pull chart for first patient."""
-    msg1, tc1, _ = invoke_staff_agent("Show me today's schedule")
+    msg1, tc1, _, _ = invoke_staff_agent("Show me today's schedule")
     assert_tool_was_called(tc1, "list_upcoming_appointments")
 
-    message, tc2, _ = invoke_staff_agent(
+    message, tc2, _, _ = invoke_staff_agent(
         "Pull up the chart for the first patient",
         history=[
             ("user", "Show me today's schedule"),

@@ -276,77 +276,105 @@ MOCK_PATIENTS = [
 
 # --- Mock medical information (educational only; not for diagnosis or treatment advice) ---
 # Symptoms map to conditions. Used by search_medical_info tool for non-diagnostic educational responses.
+# MedlinePlus (NIH) URLs for educational citations. Format: https://medlineplus.gov/[slug].html
+_CONDITION_URLS: dict[str, str] = {
+    "Common Cold": "https://medlineplus.gov/commoncold.html",
+    "Seasonal Allergies (Allergic Rhinitis)": "https://medlineplus.gov/allergy.html",
+    "Influenza (Flu)": "https://medlineplus.gov/flu.html",
+    "Tension Headache": "https://medlineplus.gov/headache.html",
+    "Migraine": "https://medlineplus.gov/migraine.html",
+    "Gastroenteritis (Stomach Flu)": "https://medlineplus.gov/gastroenteritis.html",
+    "Acid Reflux (GERD)": "https://medlineplus.gov/gerd.html",
+    "Urinary Tract Infection (UTI)": "https://medlineplus.gov/urinarytractinfections.html",
+    "Bronchitis": "https://medlineplus.gov/bronchitis.html",
+    "Anxiety": "https://medlineplus.gov/anxiety.html",
+    "Insomnia": "https://medlineplus.gov/insomnia.html",
+    "Muscle Strain": "https://medlineplus.gov/sprainsandstrains.html",
+}
+
 MOCK_MEDICAL_CONDITIONS = [
     {
         "id": "cond-001",
         "name": "Common Cold",
         "description": "A viral infection of the upper respiratory tract. Typically resolves on its own within 7–10 days. Most common in winter and spring.",
         "common_symptoms": ["runny nose", "congestion", "sore throat", "cough", "sneezing", "mild fatigue", "watery eyes"],
+        "url": _CONDITION_URLS["Common Cold"],
     },
     {
         "id": "cond-002",
         "name": "Seasonal Allergies (Allergic Rhinitis)",
         "description": "An immune response to airborne allergens such as pollen, mold, or dust. Symptoms often occur during specific seasons or in certain environments.",
         "common_symptoms": ["sneezing", "runny nose", "congestion", "itchy eyes", "watery eyes", "itchy throat", "postnasal drip"],
+        "url": _CONDITION_URLS["Seasonal Allergies (Allergic Rhinitis)"],
     },
     {
         "id": "cond-003",
         "name": "Influenza (Flu)",
         "description": "A contagious respiratory illness caused by influenza viruses. Can cause mild to severe illness. Peak season is typically fall and winter.",
         "common_symptoms": ["fever", "chills", "body aches", "fatigue", "cough", "sore throat", "headache", "congestion"],
+        "url": _CONDITION_URLS["Influenza (Flu)"],
     },
     {
         "id": "cond-004",
         "name": "Tension Headache",
         "description": "The most common type of headache. Often described as a band of pressure around the forehead or back of the head. Can be related to stress, poor posture, or eye strain.",
         "common_symptoms": ["headache", "pressure around forehead", "tightness in neck", "mild to moderate pain"],
+        "url": _CONDITION_URLS["Tension Headache"],
     },
     {
         "id": "cond-005",
         "name": "Migraine",
         "description": "A neurological condition characterized by recurrent headaches, often on one side of the head. May be accompanied by sensitivity to light, sound, or nausea.",
         "common_symptoms": ["headache", "throbbing pain", "nausea", "sensitivity to light", "sensitivity to sound", "aura", "vomiting"],
+        "url": _CONDITION_URLS["Migraine"],
     },
     {
         "id": "cond-006",
         "name": "Gastroenteritis (Stomach Flu)",
         "description": "Inflammation of the stomach and intestines, usually caused by a viral or bacterial infection. Often resolves within a few days with rest and hydration.",
         "common_symptoms": ["nausea", "vomiting", "diarrhea", "stomach cramps", "abdominal pain", "low-grade fever"],
+        "url": _CONDITION_URLS["Gastroenteritis (Stomach Flu)"],
     },
     {
         "id": "cond-007",
         "name": "Acid Reflux (GERD)",
         "description": "A condition where stomach acid flows back into the esophagus. Can cause heartburn and regurgitation. Often worsened by certain foods, lying down, or large meals.",
         "common_symptoms": ["heartburn", "chest burn", "regurgitation", "sour taste in mouth", "difficulty swallowing", "chronic cough"],
+        "url": _CONDITION_URLS["Acid Reflux (GERD)"],
     },
     {
         "id": "cond-008",
         "name": "Urinary Tract Infection (UTI)",
         "description": "An infection in any part of the urinary system—kidneys, bladder, or urethra. More common in women. Early treatment can prevent complications.",
         "common_symptoms": ["painful urination", "burning when urinating", "frequent urination", "urgency", "cloudy urine", "pelvic pain"],
+        "url": _CONDITION_URLS["Urinary Tract Infection (UTI)"],
     },
     {
         "id": "cond-009",
         "name": "Bronchitis",
         "description": "Inflammation of the bronchial tubes that carry air to the lungs. Can be acute (short-term, often viral) or chronic. Cough may persist for several weeks.",
         "common_symptoms": ["cough", "mucus production", "fatigue", "shortness of breath", "chest discomfort", "mild fever"],
+        "url": _CONDITION_URLS["Bronchitis"],
     },
     {
         "id": "cond-010",
         "name": "Anxiety",
         "description": "A mental health condition characterized by persistent worry, nervousness, or fear. Physical symptoms can include rapid heartbeat, sweating, and tension.",
         "common_symptoms": ["worry", "nervousness", "rapid heartbeat", "sweating", "trembling", "fatigue", "difficulty concentrating", "restlessness"],
+        "url": _CONDITION_URLS["Anxiety"],
     },
     {
         "id": "cond-011",
         "name": "Insomnia",
         "description": "Difficulty falling asleep, staying asleep, or waking too early. Can be short-term (stress, travel) or chronic. Sleep hygiene and routine often help.",
         "common_symptoms": ["difficulty falling asleep", "waking at night", "early waking", "fatigue", "daytime sleepiness", "irritability"],
+        "url": _CONDITION_URLS["Insomnia"],
     },
     {
         "id": "cond-012",
         "name": "Muscle Strain",
         "description": "Overstretching or tearing of muscle fibers, often from overuse or sudden movement. Common in back, neck, and legs. Rest and gradual return to activity typically help.",
         "common_symptoms": ["muscle pain", "stiffness", "swelling", "limited range of motion", "tenderness"],
+        "url": _CONDITION_URLS["Muscle Strain"],
     },
 ]

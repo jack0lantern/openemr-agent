@@ -9,6 +9,7 @@ LangGraph agents for Patient and Staff chat per PRD §4.1.
 Tools return structured JSON; the LLM formats results into human-friendly text.
 """
 
+import json
 import operator
 import os
 from functools import lru_cache
@@ -19,6 +20,9 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langgraph.graph import END, START, StateGraph, add_messages
 from typing_extensions import TypedDict
 
+from app.langsmith_client import add_cost_breakdown_to_langsmith
+from app.schemas import Citation, ResponseMetadata
+from app.llm.cost import compute_cost_usd
 from app.llm.tools import (
     book_appointment,
     get_appointment_availability,
@@ -88,7 +92,9 @@ Rules:
 - When the user mentions any relative time expression ("today", "tomorrow", "next week", "next month", "in two weeks", etc.), call get_current_datetime FIRST to resolve the real calendar date, then use the result when calling date-dependent tools.
 - For appointment-related interactions (availability, booking, listing), always call get_current_datetime FIRST to ensure only future appointments can be booked.
 
-Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user."""
+Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user.
+
+When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer."""
 
 
 def _build_patient_agent():
@@ -125,14 +131,11 @@ def _build_patient_agent():
         for tc in last.tool_calls:
             tool_fn = tools_by_name.get(tc["name"])
             obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
-            if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true":
-                debug_entries.append(
-                    {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
-                )
+            debug_entries.append(
+                {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
+            )
             results.append(ToolMessage(content=str(obs), tool_call_id=tc["id"]))
-        out: dict = {"messages": results}
-        if debug_entries:
-            out["debug_tool_calls"] = debug_entries
+        out: dict = {"messages": results, "debug_tool_calls": debug_entries}
         return out
 
     def should_continue(state: MessagesState) -> Literal["tools", "__end__"]:
@@ -170,7 +173,9 @@ Rules:
 - When the user mentions any relative time expression ("today", "tomorrow", "next week", "next month", "in two weeks", etc.), call get_current_datetime FIRST to resolve the real calendar date, then use the result when calling date-dependent tools.
 - For appointment-related interactions (availability, booking, listing), always call get_current_datetime FIRST to ensure only future appointments can be booked.
 
-Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user."""
+Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user.
+
+When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer."""
 
 
 def _build_staff_agent():
@@ -219,14 +224,11 @@ def _build_staff_agent():
         for tc in last.tool_calls:
             tool_fn = tools_by_name.get(tc["name"])
             obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
-            if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true":
-                debug_entries.append(
-                    {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
-                )
+            debug_entries.append(
+                {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
+            )
             results.append(ToolMessage(content=str(obs), tool_call_id=tc["id"]))
-        out: dict = {"messages": results}
-        if debug_entries:
-            out["debug_tool_calls"] = debug_entries
+        out: dict = {"messages": results, "debug_tool_calls": debug_entries}
         return out
 
     def should_continue(state: MessagesState) -> Literal["tools", "__end__"]:
@@ -282,6 +284,53 @@ def _aggregate_usage(messages: list) -> dict | None:
     }
 
 
+def _extract_response_metadata(tool_calls_debug: list[dict] | None) -> ResponseMetadata | None:
+    """
+    Extract citations and confidence from search_medical_info tool outputs.
+    Returns None when no medical info tool was called.
+    """
+    if not tool_calls_debug:
+        return None
+    citations: list[Citation] = []
+    match_scores: list[float] = []
+    source = "OpenEMR Medical Reference"
+    for tc in tool_calls_debug:
+        if tc.get("name") != "search_medical_info":
+            continue
+        try:
+            data = json.loads(tc.get("output", "{}"))
+        except (json.JSONDecodeError, TypeError):
+            continue
+        conditions = data.get("conditions") or []
+        for cond in conditions:
+            name = cond.get("name")
+            if name:
+                url = cond.get("url") if isinstance(cond.get("url"), str) else None
+                citations.append(
+                    Citation(title=name, source=source, tool_name="search_medical_info", url=url)
+                )
+            score = cond.get("match_score")
+            if isinstance(score, (int, float)):
+                match_scores.append(float(score))
+    if not citations:
+        return None
+    top_score = max(match_scores) if match_scores else None
+    if top_score is not None:
+        if top_score >= 0.7:
+            label = "High"
+        elif top_score >= 0.4:
+            label = "Medium"
+        else:
+            label = "Low"
+    else:
+        label = None
+    return ResponseMetadata(
+        citations=citations,
+        confidence=top_score,
+        confidence_label=label,
+    )
+
+
 # --- Public API (lazy init to avoid startup cost) ---
 
 
@@ -299,8 +348,8 @@ def invoke_patient_agent(
     user_input: str,
     history: list[tuple[str, str]] | None = None,
     patient_id: str | None = None,
-) -> tuple[str, list[dict] | None, dict | None]:
-    """Invoke patient agent and return (message, tool_calls or None, usage or None)."""
+) -> tuple[str, list[dict] | None, dict | None, ResponseMetadata | None]:
+    """Invoke patient agent and return (message, tool_calls or None, usage or None, metadata or None)."""
     messages: list = []
     if history:
         for role, content in history:
@@ -317,17 +366,36 @@ def invoke_patient_agent(
     result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
-    tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
+    all_tool_calls = result.get("debug_tool_calls") or []
+    tool_calls = all_tool_calls if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
     usage = _aggregate_usage(result["messages"])
-    return message, tool_calls, usage
+    if usage is not None:
+        cost_usd = (
+            compute_cost_usd(
+                usage["input_tokens"],
+                usage["output_tokens"],
+                model="claude-haiku-4-5",
+            )
+            if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true"
+            else None
+        )
+        add_cost_breakdown_to_langsmith(
+            usage["input_tokens"],
+            usage["output_tokens"],
+            usage["total_tokens"],
+            cost_usd,
+            model="claude-haiku-4-5",
+        )
+    metadata = _extract_response_metadata(all_tool_calls)
+    return message, tool_calls, usage, metadata
 
 
 def invoke_staff_agent(
     user_input: str,
     history: list[tuple[str, str]] | None = None,
     staff_id: str | None = None,
-) -> tuple[str, list[dict] | None, dict | None]:
-    """Invoke staff agent and return (message, tool_calls or None, usage or None)."""
+) -> tuple[str, list[dict] | None, dict | None, ResponseMetadata | None]:
+    """Invoke staff agent and return (message, tool_calls or None, usage or None, metadata or None)."""
     messages: list = []
     if history:
         for role, content in history:
@@ -344,6 +412,25 @@ def invoke_staff_agent(
     result = agent.invoke(initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
-    tool_calls = result.get("debug_tool_calls") if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
+    all_tool_calls = result.get("debug_tool_calls") or []
+    tool_calls = all_tool_calls if os.getenv("DEBUG_TOOL_CALLS", "false").lower() == "true" else None
     usage = _aggregate_usage(result["messages"])
-    return message, tool_calls, usage
+    if usage is not None:
+        cost_usd = (
+            compute_cost_usd(
+                usage["input_tokens"],
+                usage["output_tokens"],
+                model="claude-haiku-4-5",
+            )
+            if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true"
+            else None
+        )
+        add_cost_breakdown_to_langsmith(
+            usage["input_tokens"],
+            usage["output_tokens"],
+            usage["total_tokens"],
+            cost_usd,
+            model="claude-haiku-4-5",
+        )
+    metadata = _extract_response_metadata(all_tool_calls)
+    return message, tool_calls, usage, metadata

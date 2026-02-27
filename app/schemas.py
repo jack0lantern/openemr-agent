@@ -33,11 +33,29 @@ class TokenUsage(BaseModel):
     cost_usd: float | None = None
 
 
+class Citation(BaseModel):
+    """Reference to a source of medical information."""
+
+    title: str
+    source: str
+    tool_name: str
+    url: str | None = None
+
+
+class ResponseMetadata(BaseModel):
+    """Citations and confidence for medical information responses."""
+
+    citations: list[Citation] | None = None
+    confidence: float | None = None
+    confidence_label: str | None = None
+
+
 class ChatResponse(BaseModel):
     message: str
     tool_calls: list[ToolCallDebug] | None = None
     conversation_id: str | None = None
     token_usage: TokenUsage | None = None
+    metadata: ResponseMetadata | None = None
 
 
 class ConversationSummary(BaseModel):

@@ -237,7 +237,7 @@ def test_batch_patient_adversarial_guardrails(
 @pytest.mark.timeout(60)
 def test_patient_where_is_my_clinic(enable_debug_tool_calls, set_anthropic_api_key):
     """Patient with patient_id asks 'where is my clinic' → get_my_appointment_locations."""
-    message, tool_calls, _ = invoke_patient_agent(
+    message, tool_calls, _, _ = invoke_patient_agent(
         "Where is my clinic?",
         patient_id="test-pat-001",
     )
@@ -255,7 +255,7 @@ def test_patient_where_is_my_clinic(enable_debug_tool_calls, set_anthropic_api_k
 @pytest.mark.timeout(60)
 def test_staff_where_is_the_clinic(enable_debug_tool_calls, set_anthropic_api_key):
     """Staff with staff_id asks 'where is the clinic' → get_staff_assigned_clinic."""
-    message, tool_calls, _ = invoke_staff_agent(
+    message, tool_calls, _, _ = invoke_staff_agent(
         "Where is the clinic?",
         staff_id="test-staff-001",
     )
