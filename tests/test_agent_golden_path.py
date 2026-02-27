@@ -244,7 +244,25 @@ def test_patient_where_is_my_clinic(enable_debug_tool_calls, set_anthropic_api_k
     assert_tool_was_called(tool_calls, "get_my_appointment_locations")
     assert_response_contains_any(
         message,
-        ["main clinic", "room 101", "room 205", "room 301", "2025-02-24", "location"],
+        ["main clinic", "room 101", "downtown clinic", "room 201", "2025-02-24", "2025-02-25", "location"],
+    )
+
+
+@requires_api_key
+@pytest.mark.timeout(60)
+def test_patient_clinic_location_multiple_asks_to_specify(enable_debug_tool_calls, set_anthropic_api_key):
+    """Patient with multiple appointments at different locations → agent asks which one."""
+    message, tool_calls, _, _ = invoke_patient_agent(
+        "Where is the clinic?",
+        patient_id="test-pat-001",
+    )
+    assert_tool_was_called(tool_calls, "get_my_appointment_locations")
+    # Should mention both locations
+    assert_response_contains_any(message, ["main clinic", "downtown clinic"])
+    # Should ask user to specify which appointment
+    assert_response_contains_any(
+        message,
+        ["which", "which one", "specify", "which appointment", "date", "february 24", "february 25"],
     )
 
 

@@ -10,7 +10,8 @@
 --   Coverage      -> insurance_companies + insurance_data
 --   Condition     -> lists (type=medical_problem)
 --
--- Usage: docker compose exec mysql mysql -u openemr -popenemr openemr < openemr-agent/scripts/seed_fhir_data.sql
+-- Usage: docker compose exec -T mysql mysql -u openemr -popenemr openemr < openemr-agent/scripts/seed_fhir_data.sql
+--        (-T disables TTY; required when piping input)
 
 -- =============================================================================
 -- 1. ORGANIZATION (facility) - GET /fhir/Organization
@@ -34,6 +35,33 @@ WHERE `id` = 3;
 
 INSERT IGNORE INTO `uuid_registry` (`uuid`, `table_name`, `table_id`, `table_vertical`, `couchdb`, `document_drive`, `mapped`, `created`)
 VALUES (@facility_uuid, 'facility', 'id', '', '', 0, 0, NOW());
+
+-- Second location: Downtown Clinic
+SET @facility2_uuid = UNHEX(REPLACE('c3d4e5f6-b7a8-4891-c234-56789abcdef1', '-', ''));
+
+INSERT INTO `facility` (
+  `id`, `uuid`, `name`, `phone`, `fax`, `street`, `city`, `state`, `postal_code`, `country_code`,
+  `service_location`, `billing_location`, `accepts_assignment`, `color`, `primary_business_entity`, `extra_validation`,
+  `inactive`, `info`
+) VALUES (
+  4, @facility2_uuid, 'Downtown Clinic', '(503) 777-0200', '(503) 777-0201',
+  '200 Commerce St, Suite 100', 'Portland', 'OR', '97205', 'US',
+  1, 1, 1, '#99CCFF', 0, 1, 0,
+  'Hours: Mon–Fri 8am–5pm. Street parking and nearby garage.'
+) ON DUPLICATE KEY UPDATE
+  `name` = VALUES(`name`),
+  `phone` = VALUES(`phone`),
+  `fax` = VALUES(`fax`),
+  `street` = VALUES(`street`),
+  `city` = VALUES(`city`),
+  `state` = VALUES(`state`),
+  `postal_code` = VALUES(`postal_code`),
+  `country_code` = VALUES(`country_code`),
+  `info` = VALUES(`info`),
+  `uuid` = VALUES(`uuid`);
+
+INSERT IGNORE INTO `uuid_registry` (`uuid`, `table_name`, `table_id`, `table_vertical`, `couchdb`, `document_drive`, `mapped`, `created`)
+VALUES (@facility2_uuid, 'facility', 'id', '', '', 0, 0, NOW());
 
 -- =============================================================================
 -- 2. PRACTITIONER (users) - GET /fhir/Practitioner

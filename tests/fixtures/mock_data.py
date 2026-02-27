@@ -217,6 +217,19 @@ TEST_APPOINTMENTS = [
         "status": "completed",
         "location": "Main Clinic - Procedure Room",
     },
+    {
+        "id": "test-apt-006",
+        "patientName": "Test Patient Alpha",
+        "patientId": "test-pat-001",
+        "providerId": "test-prov-002",
+        "providerName": "Dr. Test Internist",
+        "date": "2025-02-25",
+        "time": "2:00 PM",
+        "duration": 30,
+        "type": "follow-up",
+        "status": "scheduled",
+        "location": "Downtown Clinic - Room 201",
+    },
 ]
 
 # Staff with assigned facilities (for get_staff_assigned_clinic)

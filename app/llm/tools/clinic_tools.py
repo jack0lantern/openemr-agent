@@ -48,7 +48,7 @@ def list_providers(specialty: str = "") -> str:
 
 @tool
 def get_my_appointment_locations(patient_id: str) -> str:
-    """Get locations of the patient's upcoming appointments. Use when a patient asks 'where is my clinic' or 'where are my appointments'—return the locations where they have upcoming visits."""
+    """Get locations of the patient's upcoming appointments. Use when a patient asks 'where is the clinic', 'where do I go', or 'where are my appointments'—return the locations where they have upcoming visits. When multiple different locations are returned, ask the user to specify which appointment they mean (by date or provider)."""
     data = _get_my_appointment_locations_svc(patient_id)
     return _tool_result(data)
 

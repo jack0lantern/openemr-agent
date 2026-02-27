@@ -43,8 +43,6 @@ _FHIR_SCOPES = (
     "system/Coverage.read "
     "system/Organization.read "
     "system/Location.read "
-    # Scheduling
-    "system/Schedule.read "
     # Other
     "system/Person.read "
     "system/Group.read "
