@@ -23,6 +23,7 @@ from typing_extensions import TypedDict
 from app.langsmith_client import add_cost_breakdown_to_langsmith
 from app.schemas import Citation, ResponseMetadata
 from app.llm.cost import compute_cost_usd
+from app.llm.retry import invoke_with_retry
 from app.llm.tools import (
     book_appointment,
     get_appointment_availability,
@@ -363,7 +364,7 @@ def invoke_patient_agent(
     initial: dict = {"messages": messages, "debug_tool_calls": []}
     if patient_id:
         initial["patient_id"] = patient_id
-    result = agent.invoke(initial)
+    result = invoke_with_retry(agent.invoke, initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     all_tool_calls = result.get("debug_tool_calls") or []
@@ -409,7 +410,7 @@ def invoke_staff_agent(
     initial: dict = {"messages": messages, "debug_tool_calls": []}
     if staff_id:
         initial["staff_id"] = staff_id
-    result = agent.invoke(initial)
+    result = invoke_with_retry(agent.invoke, initial)
     final = result["messages"][-1]
     message = final.content if hasattr(final, "content") else str(final)
     all_tool_calls = result.get("debug_tool_calls") or []

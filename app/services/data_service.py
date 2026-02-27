@@ -67,6 +67,35 @@ def _fhir_practitioner_to_provider(resource: dict) -> dict:
     }
 
 
+def _fhir_slot_to_available_slot(resource: dict) -> dict:
+    """Transform FHIR Slot to mock available-slot shape."""
+    start = resource.get("start", "")
+    end = resource.get("end", "")
+    dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
+    date_str = dt.strftime("%Y-%m-%d") if dt else ""
+    time_str = (dt.strftime("%I:%M %p").lstrip("0") if dt else "")
+
+    duration = 30
+    if start and end:
+        try:
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            duration = int((end_dt - start_dt).total_seconds() / 60)
+        except (ValueError, TypeError):
+            pass
+
+    return {
+        "id": resource.get("id", ""),
+        "date": date_str,
+        "time": time_str,
+        "providerId": "",
+        "providerName": "",
+        "duration": duration,
+        "location": "",
+        "type": "visit",
+    }
+
+
 def _fhir_appointment_to_appointment(resource: dict) -> dict:
     """Transform FHIR Appointment to mock appointment shape."""
     start = resource.get("start", "")

@@ -10,6 +10,7 @@ import os  # AI-generated
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.llm.agent import get_patient_agent, get_staff_agent
+from app.llm.retry import invoke_with_retry
 
 
 def _messages_from_request(
@@ -50,7 +51,7 @@ def batch_invoke_patient_agent(
         if extra.get("patient_id"):
             initial["patient_id"] = extra["patient_id"]
         initials.append(initial)
-    results = agent.batch(initials)
+    results = invoke_with_retry(agent.batch, initials)
     outputs = []
     for result in results:
         final = result["messages"][-1]
@@ -83,7 +84,7 @@ def batch_invoke_staff_agent(
         if extra.get("staff_id"):
             initial["staff_id"] = extra["staff_id"]
         initials.append(initial)
-    results = agent.batch(initials)
+    results = invoke_with_retry(agent.batch, initials)
     outputs = []
     for result in results:
         final = result["messages"][-1]
