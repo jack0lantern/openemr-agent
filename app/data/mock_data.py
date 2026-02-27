@@ -290,6 +290,7 @@ _CONDITION_URLS: dict[str, str] = {
     "Anxiety": "https://medlineplus.gov/anxiety.html",
     "Insomnia": "https://medlineplus.gov/insomnia.html",
     "Muscle Strain": "https://medlineplus.gov/sprainsandstrains.html",
+    "Fluid Overload (Edema)": "https://medlineplus.gov/edema.html",
 }
 
 MOCK_MEDICAL_CONDITIONS = [
@@ -376,5 +377,12 @@ MOCK_MEDICAL_CONDITIONS = [
         "description": "Overstretching or tearing of muscle fibers, often from overuse or sudden movement. Common in back, neck, and legs. Rest and gradual return to activity typically help.",
         "common_symptoms": ["muscle pain", "stiffness", "swelling", "limited range of motion", "tenderness"],
         "url": _CONDITION_URLS["Muscle Strain"],
+    },
+    {
+        "id": "cond-013",
+        "name": "Fluid Overload (Edema)",
+        "description": "Fluid overload occurs when the body retains too much fluid. It often leads to edema—swelling caused by excess fluid trapped in body tissues. Common causes include heart failure, kidney disease, liver disease, and certain medications.",
+        "common_symptoms": ["edema", "swelling", "fluid retention", "puffy legs", "ankle swelling", "shortness of breath", "weight gain"],
+        "url": _CONDITION_URLS["Fluid Overload (Edema)"],
     },
 ]

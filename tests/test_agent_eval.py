@@ -81,6 +81,46 @@ def test_eval_patient_internal_medicine_doctor(enable_debug_tool_calls, set_anth
 
 
 @requires_api_key
+@pytest.mark.timeout(90)
+def test_eval_patient_fluid_overload_edema_source_verification(
+    enable_debug_tool_calls, set_anthropic_api_key
+):
+    """User asks about fluid overload and edema; verify agent response is grounded in source."""
+    query = "What could cause edema?"
+    message, tool_calls, _, _ = invoke_patient_agent(query)
+
+    assert_tool_was_called(tool_calls, "search_medical_info")
+    output = _get_tool_output(tool_calls, "search_medical_info")
+    assert output is not None, "search_medical_info should return output"
+
+    data = json.loads(output)
+    conditions = data.get("conditions", [])
+    assert len(conditions) > 0, "Expected at least one matching condition for fluid overload/edema"
+
+    # Build source text from tool output (what the agent had access to)
+    source_text_parts: list[str] = []
+    for cond in conditions:
+        source_text_parts.append(cond.get("name", ""))
+        source_text_parts.append(cond.get("description", ""))
+        source_text_parts.extend(cond.get("common_symptoms", []))
+    source_text = " ".join(source_text_parts).lower()
+
+    # Key facts that must appear in both source and agent response
+    key_facts = ["fluid", "edema", "swelling"]
+    for fact in key_facts:
+        assert fact in source_text, (
+            f"Source (tool output) must contain '{fact}'. Got conditions: {[c.get('name') for c in conditions]}"
+        )
+
+    # Agent response must reflect information from the source
+    message_lower = message.lower()
+    assert any(fact in message_lower for fact in key_facts), (
+        f"Agent response must mention fluid overload/edema info from source. Got: {message[:300]}"
+    )
+    assert_response_contains_any(message, ["consult", "provider", "educational"])
+
+
+@requires_api_key
 @pytest.mark.timeout(60)
 def test_eval_patient_medical_info_response_matches_mock_database(
     enable_debug_tool_calls, set_anthropic_api_key
