@@ -41,6 +41,29 @@ docker build -t openemr-agent .
 docker run -p 8000:8000 openemr-agent
 ```
 
+## Project Structure
+
+```
+app/
+├── api/                     # FastAPI route handlers (patient.py, staff.py)
+├── data/                    # Mock data for dev/demo
+├── llm/
+│   ├── agent.py             # LangGraph graphs, system prompts, invoke_*_agent
+│   └── tools/               # LangChain @tool definitions, one module per domain
+│       ├── __init__.py      # Re-exports all tools
+│       ├── _utils.py        # Shared JSON serialization helper
+│       ├── datetime_tools.py        # get_current_datetime
+│       ├── scheduling_tools.py      # availability, booking, appointments
+│       ├── clinic_tools.py          # clinic info, providers, locations
+│       ├── medical_info_tools.py    # educational symptom search
+│       ├── clinical_tools.py        # patient records (staff only)
+│       └── insurance_tools.py       # coverage verification (staff only)
+├── schemas.py               # Pydantic request/response models
+└── services/                # Data access layer (mock or FHIR)
+```
+
+To add a new tool: implement it in the appropriate `tools/` module, re-export it from `tools/__init__.py`, then add it to the tool list in `agent.py`.
+
 ## Testing
 
 ```bash

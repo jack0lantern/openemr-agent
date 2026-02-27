@@ -106,25 +106,39 @@ SET @slot_uuid = UNHEX(REPLACE('a3b4c5d6-e7f8-4901-a234-f01234567890', '-', ''))
 SET @prac1_id = (SELECT id FROM users WHERE username = 'fhir-seed-apatel' LIMIT 1);
 SET @prac2_id = (SELECT id FROM users WHERE username = 'fhir-seed-jfoster' LIMIT 1);
 
+-- pc_sharing = 3 (SHARING_GLOBAL) makes events visible to all users on the calendar,
+-- not just the owning provider. pc_multiple = 0 satisfies the NOT NULL constraint.
+--
+-- Appointment 1: Vikram Sharma (pid 900001) with Dr. Anita Patel (Cardiology)
+--   Title    : Follow-up
+--   Date     : today + 6 days, 9:00 AM – 9:30 AM (30 min)
+--   Status   : booked (pc_apptstatus = '>')
 INSERT INTO `openemr_postcalendar_events` (
-  `pc_catid`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_facility`, `uuid`
+  `pc_catid`, `pc_multiple`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_sharing`, `pc_facility`, `uuid`
 )
-SELECT 3, COALESCE(@prac1_id, 0), '900001', 'Follow-up', CURDATE() + INTERVAL 3 DAY, CURDATE() + INTERVAL 3 DAY, '09:00:00', '09:30:00', 1800, 1, '>', 3, @apt1_uuid
+SELECT 3, 0, COALESCE(@prac1_id, 0), '900001', 'Follow-up', CURDATE() + INTERVAL 6 DAY, CURDATE() + INTERVAL 6 DAY, '09:00:00', '09:30:00', 1800, 1, '>', 3, 3, @apt1_uuid
 WHERE @prac1_id IS NOT NULL
 ON DUPLICATE KEY UPDATE `uuid` = VALUES(`uuid`);
 
+-- Appointment 2: Olivia Nguyen (pid 900002) with Dr. James Foster (Dermatology)
+--   Title    : Skin check
+--   Date     : today + 10 days, 2:00 PM – 2:20 PM (20 min)
+--   Status   : booked (pc_apptstatus = '>')
 INSERT INTO `openemr_postcalendar_events` (
-  `pc_catid`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_facility`, `uuid`
+  `pc_catid`, `pc_multiple`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_sharing`, `pc_facility`, `uuid`
 )
-SELECT 3, COALESCE(@prac2_id, 0), '900002', 'Skin check', CURDATE() + INTERVAL 5 DAY, CURDATE() + INTERVAL 5 DAY, '14:00:00', '14:20:00', 1200, 1, '>', 3, @apt2_uuid
+SELECT 3, 0, COALESCE(@prac2_id, 0), '900002', 'Skin check', CURDATE() + INTERVAL 10 DAY, CURDATE() + INTERVAL 10 DAY, '14:00:00', '14:20:00', 1200, 1, '>', 3, 3, @apt2_uuid
 WHERE @prac2_id IS NOT NULL
 ON DUPLICATE KEY UPDATE `uuid` = VALUES(`uuid`);
 
--- Available slot (pc_apptstatus = '-' means free)
+-- Open slot: Dr. Anita Patel (Cardiology) — no patient assigned
+--   Title    : Open slot
+--   Date     : today + 14 days, 10:00 AM – 10:30 AM (30 min)
+--   Status   : available (pc_apptstatus = '-')
 INSERT IGNORE INTO `openemr_postcalendar_events` (
-  `pc_catid`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_facility`, `uuid`
+  `pc_catid`, `pc_multiple`, `pc_aid`, `pc_pid`, `pc_title`, `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`, `pc_duration`, `pc_eventstatus`, `pc_apptstatus`, `pc_sharing`, `pc_facility`, `uuid`
 )
-SELECT 3, COALESCE(@prac1_id, 0), NULL, 'Open slot', CURDATE() + INTERVAL 7 DAY, CURDATE() + INTERVAL 7 DAY, '10:00:00', '10:30:00', 1800, 1, '-', 3, @slot_uuid
+SELECT 3, 0, COALESCE(@prac1_id, 0), NULL, 'Open slot', CURDATE() + INTERVAL 14 DAY, CURDATE() + INTERVAL 14 DAY, '10:00:00', '10:30:00', 1800, 1, '-', 3, 3, @slot_uuid
 WHERE @prac1_id IS NOT NULL;
 
 INSERT IGNORE INTO `uuid_registry` (`uuid`, `table_name`, `table_id`, `table_vertical`, `couchdb`, `document_drive`, `mapped`, `created`)
