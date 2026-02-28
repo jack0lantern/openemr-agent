@@ -10,9 +10,12 @@ Tools return structured JSON; the LLM formats results into human-friendly text.
 """
 
 import json
+import logging
 import operator
 import os
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 from typing import Annotated, Literal
 
 from langchain_anthropic import ChatAnthropic
@@ -133,7 +136,11 @@ def _build_patient_agent():
         debug_entries = []
         for tc in last.tool_calls:
             tool_fn = tools_by_name.get(tc["name"])
-            obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
+            try:
+                obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
+            except Exception as e:
+                obs = f"Error: {type(e).__name__}: {e}"
+                logger.exception("Tool %s failed", tc["name"])
             debug_entries.append(
                 {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
             )
@@ -227,7 +234,11 @@ def _build_staff_agent():
         debug_entries = []
         for tc in last.tool_calls:
             tool_fn = tools_by_name.get(tc["name"])
-            obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
+            try:
+                obs = tool_fn.invoke(tc["args"]) if tool_fn else "Tool not found"
+            except Exception as e:
+                obs = f"Error: {type(e).__name__}: {e}"
+                logger.exception("Tool %s failed", tc["name"])
             debug_entries.append(
                 {"name": tc["name"], "args": dict(tc.get("args", {})), "output": str(obs)}
             )
