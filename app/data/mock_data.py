@@ -386,3 +386,80 @@ MOCK_MEDICAL_CONDITIONS = [
         "url": _CONDITION_URLS["Fluid Overload (Edema)"],
     },
 ]
+
+# --- Mock pharmaceutical information (educational only; not for diagnosis or treatment advice) ---
+# MedlinePlus (NIH) URLs for educational citations. Format: https://medlineplus.gov/druginfo/meds/[id].html
+_PHARMA_URLS: dict[str, str] = {
+    "Lisinopril": "https://medlineplus.gov/druginfo/meds/a692051.html",
+    "Metformin": "https://medlineplus.gov/druginfo/meds/a696005.html",
+    "Atorvastatin": "https://medlineplus.gov/druginfo/meds/a696005.html",
+    "Levothyroxine": "https://medlineplus.gov/druginfo/meds/a682461.html",
+    "Amlodipine": "https://medlineplus.gov/druginfo/meds/a692044.html",
+    "Metoprolol": "https://medlineplus.gov/druginfo/meds/a692045.html",
+    "Omeprazole": "https://medlineplus.gov/druginfo/meds/a693050.html",
+    "Losartan": "https://medlineplus.gov/druginfo/meds/a695020.html",
+    "Albuterol": "https://medlineplus.gov/druginfo/meds/a682145.html",
+    "Gabapentin": "https://medlineplus.gov/druginfo/meds/a694007.html",
+    "Warfarin": "https://medlineplus.gov/druginfo/meds/a682277.html",
+}
+
+MOCK_PHARMACEUTICALS = [
+    {
+        "id": "rx-001",
+        "name": "Lisinopril",
+        "description": "Lisinopril is used to treat high blood pressure. It is in a class of medications called angiotensin-converting enzyme (ACE) inhibitors.",
+        "common_uses": ["high blood pressure", "heart failure"],
+        "url": _PHARMA_URLS["Lisinopril"],
+    },
+    {
+        "id": "rx-002",
+        "name": "Metformin",
+        "description": "Metformin is used alone or with other medications, including insulin, to treat type 2 diabetes.",
+        "common_uses": ["type 2 diabetes", "blood sugar control"],
+        "url": _PHARMA_URLS["Metformin"],
+    },
+    {
+        "id": "rx-003",
+        "name": "Atorvastatin",
+        "description": "Atorvastatin is used together with diet, weight loss, and exercise to reduce the risk of heart attack and stroke.",
+        "common_uses": ["high cholesterol", "prevent heart attack", "prevent stroke"],
+        "url": _PHARMA_URLS["Atorvastatin"],
+    },
+    {
+        "id": "rx-004",
+        "name": "Levothyroxine",
+        "description": "Levothyroxine is used to treat hypothyroidism (a condition where the thyroid gland does not produce enough thyroid hormone).",
+        "common_uses": ["hypothyroidism", "thyroid hormone replacement"],
+        "url": _PHARMA_URLS["Levothyroxine"],
+    },
+    {
+        "id": "rx-005",
+        "name": "Amlodipine",
+        "description": "Amlodipine is used alone or in combination with other medications to treat high blood pressure and chest pain (angina).",
+        "common_uses": ["high blood pressure", "angina", "chest pain"],
+        "url": _PHARMA_URLS["Amlodipine"],
+    },
+    {
+        "id": "rx-006",
+        "name": "Warfarin",
+        "description": "Warfarin is an anticoagulant (blood thinner) used to prevent and treat blood clots. Many medications, supplements, and foods can interact with warfarin and affect its effectiveness or increase bleeding risk.",
+        "common_uses": ["blood clots", "anticoagulation", "stroke prevention", "atrial fibrillation"],
+        "url": _PHARMA_URLS["Warfarin"],
+        "interacting_medications": [
+            "aspirin",
+            "ibuprofen",
+            "naproxen",
+            "NSAIDs",
+            "omeprazole",
+            "famotidine",
+            "St. John's wort",
+            "garlic",
+            "Ginkgo biloba",
+            "ginseng",
+            "Echinacea",
+            "goldenseal",
+            "coenzyme Q10",
+            "certain antibiotics",
+        ],
+    },
+]

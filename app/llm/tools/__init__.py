@@ -31,7 +31,7 @@ from app.llm.tools.clinical_tools import (
 )
 from app.llm.tools.datetime_tools import get_current_datetime
 from app.llm.tools.insurance_tools import verify_insurance
-from app.llm.tools.medical_info_tools import search_medical_info
+from app.llm.tools.medical_info_tools import search_medical_info, search_pharmaceutical_info
 from app.llm.tools.scheduling_tools import (
     book_appointment,
     get_appointment_availability,
@@ -56,6 +56,7 @@ __all__ = [
     "get_staff_assigned_clinic",
     # medical info
     "search_medical_info",
+    "search_pharmaceutical_info",
     # clinical (staff)
     "lookup_patient_summary",
     "lookup_patient_allergies",

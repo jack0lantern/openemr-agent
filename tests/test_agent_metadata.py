@@ -96,3 +96,26 @@ def test_extract_response_metadata_invalid_json_skips_tool():
         {"name": "search_medical_info", "args": {}, "output": "not valid json"},
     ]
     assert _extract_response_metadata(tool_calls) is None
+
+def test_extract_response_metadata_pharmaceutical_info_returns_citations():
+    """search_pharmaceutical_info tool call produces citations and confidence."""
+    output = json.dumps({
+        "medications": [
+            {"name": "Lisinopril", "description": "...", "common_uses": ["high blood pressure"], "match_score": 0.9},
+        ],
+        "query": "blood pressure",
+        "disclaimer": "Educational only.",
+    })
+    tool_calls = [
+        {"name": "search_pharmaceutical_info", "args": {"query": "blood pressure"}, "output": output},
+    ]
+    meta = _extract_response_metadata(tool_calls)
+    assert meta is not None
+    assert isinstance(meta, ResponseMetadata)
+    assert meta.citations is not None
+    assert len(meta.citations) == 1
+    assert meta.citations[0].title == "Lisinopril"
+    assert meta.citations[0].source == "OpenEMR Medical Reference"
+    assert meta.citations[0].tool_name == "search_pharmaceutical_info"
+    assert meta.confidence == 0.9
+    assert meta.confidence_label == "High"

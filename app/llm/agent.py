@@ -49,6 +49,7 @@ from app.llm.tools import (
     lookup_patient_summary,
     lookup_patient_vitals,
     search_medical_info,
+    search_pharmaceutical_info,
     verify_insurance,
 )
 
@@ -99,7 +100,9 @@ Rules:
 
 Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user.
 
-When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer."""
+When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer.
+
+When reporting search_pharmaceutical_info results: (1) cite the source for each medication (e.g. "According to MedlinePlus..."); (2) ALWAYS include the url link when the tool result provides one—format as "Learn more: [medication name](url)" or similar so the user can click; (3) incorporate confidence naturally; (4) always include the educational disclaimer."""
 
 
 def _build_patient_agent():
@@ -115,6 +118,7 @@ def _build_patient_agent():
         get_patient_appointments,
         book_appointment,
         search_medical_info,
+    search_pharmaceutical_info,
     ]
     tools_by_name = {t.name: t for t in tools}
     model_with_tools = model.bind_tools(tools)
@@ -185,7 +189,9 @@ Rules:
 
 Tool results are returned as JSON. Parse the JSON and format the data into clear, human-friendly text for the user. Do not dump raw JSON to the user.
 
-When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer."""
+When reporting search_medical_info results: (1) cite the source for each condition (e.g. "According to MedlinePlus..."); (2) include the url link when the tool result provides one (e.g. "Learn more: [condition name](url)"); (3) incorporate confidence naturally (e.g. "Migraine is a high-confidence match for your symptoms"); (4) always include the educational disclaimer.
+
+When reporting search_pharmaceutical_info results: (1) cite the source for each medication (e.g. "According to MedlinePlus..."); (2) ALWAYS include the url link when the tool result provides one—format as "Learn more: [medication name](url)" or similar so the user can click; (3) incorporate confidence naturally; (4) always include the educational disclaimer."""
 
 
 def _build_staff_agent():
@@ -202,6 +208,7 @@ def _build_staff_agent():
         list_upcoming_appointments,
         book_appointment,
         search_medical_info,
+    search_pharmaceutical_info,
         lookup_patient_summary,
         lookup_patient_allergies,
         lookup_patient_medications,
@@ -301,7 +308,7 @@ def _aggregate_usage(messages: list) -> dict | None:
 
 def _extract_response_metadata(tool_calls_debug: list[dict] | None) -> ResponseMetadata | None:
     """
-    Extract citations and confidence from search_medical_info tool outputs.
+    Extract citations and confidence from search_medical_info and search_pharmaceutical_info tool outputs.
     Returns None when no medical info tool was called.
     """
     if not tool_calls_debug:
@@ -310,21 +317,23 @@ def _extract_response_metadata(tool_calls_debug: list[dict] | None) -> ResponseM
     match_scores: list[float] = []
     source = "OpenEMR Medical Reference"
     for tc in tool_calls_debug:
-        if tc.get("name") != "search_medical_info":
+        tool_name = tc.get("name")
+        if tool_name not in ("search_medical_info", "search_pharmaceutical_info"):
             continue
         try:
             data = json.loads(tc.get("output", "{}"))
         except (json.JSONDecodeError, TypeError):
             continue
-        conditions = data.get("conditions") or []
-        for cond in conditions:
-            name = cond.get("name")
+        
+        items = data.get("conditions") or data.get("medications") or []
+        for item in items:
+            name = item.get("name")
             if name:
-                url = cond.get("url") if isinstance(cond.get("url"), str) else None
+                url = item.get("url") if isinstance(item.get("url"), str) else None
                 citations.append(
-                    Citation(title=name, source=source, tool_name="search_medical_info", url=url)
+                    Citation(title=name, source=source, tool_name=tool_name, url=url)
                 )
-            score = cond.get("match_score")
+            score = item.get("match_score")
             if isinstance(score, (int, float)):
                 match_scores.append(float(score))
     if not citations:

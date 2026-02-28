@@ -1089,6 +1089,54 @@ def search_conditions(symptoms: str) -> list[dict]:
     return _run_async(_fetch())
 
 
+
+def search_pharmaceuticals(query: str) -> list[dict]:
+    """Search for pharmaceutical information by drug name or use."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":
+        from app.data.mock_data import MOCK_PHARMACEUTICALS
+
+        q = query.lower().strip()
+        results = []
+        for rx in MOCK_PHARMACEUTICALS:
+            score = 0
+            # Match when drug name appears in query (e.g. "warfarin" in "warfarin what meds interact")
+            if rx["name"].lower() in q:
+                score += 2
+            # Match when query is exact/short drug name
+            if q in rx["name"].lower():
+                score += 2
+            # Match when common use appears in query
+            if any(use.lower() in q for use in rx["common_uses"]):
+                score += 1
+            # Boost for interaction queries when drug has interaction data
+            if "interact" in q and rx.get("interacting_medications"):
+                score += 2
+            if score > 0:
+                results.append({"rx": rx, "score": score})
+        
+        results.sort(key=lambda x: x["score"], reverse=True)
+        
+        out = []
+        for r in results:
+            rx = r["rx"]
+            match_score = 0.9 if r["score"] >= 2 else 0.6
+            item = {
+                "name": rx["name"],
+                "description": rx["description"],
+                "common_uses": rx["common_uses"],
+                "url": rx.get("url"),
+                "match_score": match_score,
+            }
+            # Include interaction info when user asks about interactions
+            if "interact" in q and rx.get("interacting_medications"):
+                item["interacting_medications"] = rx["interacting_medications"]
+            out.append(item)
+        return out
+    
+    # In a real implementation, this would query an external drug database or FHIR MedicationKnowledge
+    # For now, we just return empty if not using mock data
+    return []
+
 def get_clinic_info(query: str = "") -> dict:
     """Get clinic info and optionally filtered providers."""
     if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
