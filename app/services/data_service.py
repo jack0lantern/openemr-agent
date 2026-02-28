@@ -2,7 +2,8 @@
 # Returns identical dict shapes for agent tools regardless of data source
 
 import asyncio
-import os  # AI-generated
+import os
+import re
 from datetime import date, datetime, timedelta
 
 from app.data.appointment_type_durations import get_duration_minutes
@@ -764,6 +765,16 @@ def book_appointment(
                 "location": slot["location"],
             },
             "confirmation_note": "Confirmation will be sent via email",
+        }
+
+    _UUID_RE = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+    )
+    if not _UUID_RE.match(slot_id):
+        return {
+            "success": False,
+            "error": f"Invalid slot_id '{slot_id}'. Slot IDs must be UUIDs returned by get_appointment_availability.",
+            "suggestion": "Call get_appointment_availability first to get valid slot IDs, then pass the exact 'id' value.",
         }
 
     async def _book():
