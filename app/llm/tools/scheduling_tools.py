@@ -2,6 +2,7 @@
 
 from langchain_core.tools import tool
 
+from app.data.appointment_type_durations import get_all_appointment_types
 from app.llm.tools._utils import _tool_result
 from app.services.data_service import (
     book_appointment as _book_appointment_svc,
@@ -13,9 +14,21 @@ from app.services.data_service import (
 
 
 @tool
-def get_appointment_availability(date: str) -> str:
-    """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Call get_current_datetime FIRST to establish the current date, then pass only future dates in YYYY-MM-DD format. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') using get_current_datetime's relative_ranges."""
-    slots = get_available_slots(date)
+def list_appointment_types() -> str:
+    """List appointment types and their default durations (minutes). Use when the user asks what types of appointments are available, or before checking availability for a specific type. Durations are from OpenEMR defaults."""
+    types = get_all_appointment_types()
+    return _tool_result({
+        "appointment_types": [
+            {"type": t["type"], "label": t["label"], "duration_minutes": t["duration_minutes"]}
+            for t in types
+        ],
+    })
+
+
+@tool
+def get_appointment_availability(date: str, appointment_type: str | None = None) -> str:
+    """Check appointment availability for a given date. Use for queries about openings, available slots, or 'do you have anything on X'. Call get_current_datetime FIRST to establish the current date, then pass only future dates in YYYY-MM-DD format. Infer the date from natural language (e.g. 'next Friday', 'tomorrow') using get_current_datetime's relative_ranges. When the user specifies an appointment type (e.g. 'new patient', 'follow-up', 'checkup'), pass appointment_type so only slots that fit that duration are returned. Use list_appointment_types to see valid types and durations."""
+    slots = get_available_slots(date, appointment_type=appointment_type)
     available_dates = sorted({s["date"] for s in slots}) if slots else get_available_dates()
     if not slots:
         return _tool_result({

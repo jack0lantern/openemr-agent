@@ -215,16 +215,19 @@ class FHIRClient:
         self,
         patient_id: str | None = None,
         date_ge: str | None = None,
+        date_le: str | None = None,
         status: str | None = None,
     ) -> dict:
         """GET /fhir/Appointment with optional filters."""
-        params: dict = {}
+        params: list[tuple[str, str]] = []
         if patient_id:
-            params["patient"] = f"Patient/{patient_id}"
+            params.append(("patient", f"Patient/{patient_id}"))
         if date_ge:
-            params["date"] = f"ge{date_ge}"
+            params.append(("date", f"ge{date_ge}"))
+        if date_le:
+            params.append(("date", f"le{date_le}"))
         if status:
-            params["status"] = status
+            params.append(("status", status))
         return await self._request("GET", "Appointment", params=params if params else None)
 
     async def get_schedules(self) -> dict:

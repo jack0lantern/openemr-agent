@@ -190,3 +190,42 @@ ON DUPLICATE KEY UPDATE `uuid` = VALUES(`uuid`);
 INSERT IGNORE INTO `uuid_registry` (`uuid`, `table_name`, `table_id`, `table_vertical`, `couchdb`, `document_drive`, `mapped`, `created`)
 VALUES (@cond1_uuid, 'lists', 'id', '', '', 0, 0, NOW()),
        (@cond2_uuid, 'lists', 'id', '', '', 0, 0, NOW());
+
+-- =============================================================================
+-- 7. PROVIDER SCHEDULE (openemr_postcalendar_events) - GET /fhir/Schedule
+-- In Office 8 am – 5 pm Mon–Fri as a single recurring event through end of year.
+-- Modeled from a manually created row: pc_recurrtype = 3 (weekly on specific days),
+-- event_repeat_freq_type = 6, event_repeat_freq = "2,3,4,5,6" (Mon–Fri).
+-- =============================================================================
+
+-- Clear prior seed availability for these providers so re-runs are idempotent
+DELETE FROM `openemr_postcalendar_events`
+WHERE `pc_catid` = 2
+  AND `pc_apptstatus` = '-'
+  AND `pc_aid` IN (
+    SELECT id FROM users WHERE username IN ('fhir-seed-apatel', 'fhir-seed-jfoster', 'fhir-seed-rkim')
+  );
+
+-- One recurring In Office event per provider. pc_eventDate = next Monday;
+-- pc_endDate = Dec 31 of current year. Duration 32400 s = 9 h (08:00–17:00).
+INSERT INTO `openemr_postcalendar_events` (
+  `pc_catid`, `pc_multiple`, `pc_aid`, `pc_pid`, `pc_title`,
+  `pc_topic`, `pc_informant`,
+  `pc_eventDate`, `pc_endDate`, `pc_startTime`, `pc_endTime`,
+  `pc_duration`, `pc_recurrtype`, `pc_recurrspec`, `pc_recurrfreq`,
+  `pc_eventstatus`, `pc_apptstatus`, `pc_sharing`, `pc_facility`, `pc_billing_location`
+)
+SELECT
+  2, 0, u.id, NULL, 'In Office',
+  1, 1,
+  CURDATE() + INTERVAL (9 - DAYOFWEEK(CURDATE())) % 7 DAY,
+  STR_TO_DATE(CONCAT(YEAR(CURDATE()), '-12-31'), '%Y-%m-%d'),
+  '08:00:00', '17:00:00',
+  32400, 3,
+  'a:6:{s:17:"event_repeat_freq";s:9:"2,3,4,5,6";s:22:"event_repeat_freq_type";s:1:"6";s:19:"event_repeat_on_num";s:1:"1";s:19:"event_repeat_on_day";s:1:"0";s:20:"event_repeat_on_freq";s:1:"0";s:6:"exdate";s:0:"";}',
+  0,
+  1, '-', 1, 3, 3
+FROM (
+  SELECT id FROM users
+  WHERE username IN ('fhir-seed-apatel', 'fhir-seed-jfoster', 'fhir-seed-rkim')
+) u;

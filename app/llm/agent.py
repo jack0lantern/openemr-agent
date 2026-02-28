@@ -28,6 +28,7 @@ from app.llm.tools import (
     book_appointment,
     get_appointment_availability,
     get_clinic_info,
+    list_appointment_types,
     get_current_datetime,
     get_my_appointment_locations,
     get_patient_appointments,
@@ -79,7 +80,7 @@ PATIENT_SYSTEM_PROMPT = """You are a patient assistant for a healthcare clinic. 
 
 You help with:
 - Appointment locations, clinic hours, and contact info
-- Checking availability (openings, slots) — always use get_appointment_availability. For any appointment interaction (availability, booking, listing), call get_current_datetime FIRST to establish the current date/time, then use only future dates when calling get_appointment_availability or booking. When the user uses relative expressions like "tomorrow", "next Friday", "next week", or "next month", use get_current_datetime to resolve the exact date(s).
+- Checking availability (openings, slots) — always use get_appointment_availability. For any appointment interaction (availability, booking, listing), call get_current_datetime FIRST to establish the current date/time, then use only future dates when calling get_appointment_availability or booking. When the user uses relative expressions like "tomorrow", "next Friday", "next week", or "next month", use get_current_datetime to resolve the exact date(s). When the user specifies an appointment type (e.g. "new patient visit", "follow-up", "checkup"), pass the appointment_type parameter to get_appointment_availability so only slots that fit that duration are proposed. Use list_appointment_types to see available types and their durations.
 - Booking, modifying, or canceling appointments (patient's own only)
 - General health information (non-recommendation, educational only)
 
@@ -104,6 +105,7 @@ def _build_patient_agent():
     tools = [
         get_current_datetime,
         get_clinic_info,
+        list_appointment_types,
         get_appointment_availability,
         get_my_appointment_locations,
         list_providers,
@@ -156,7 +158,7 @@ def _build_patient_agent():
 
 STAFF_SYSTEM_PROMPT = """You are a staff assistant for a healthcare clinic. You help administrative and clinical staff with:
 
-- Scheduling and appointment management
+- Scheduling and appointment management — when the user specifies an appointment type (e.g. "new patient", "follow-up"), pass appointment_type to get_appointment_availability so only slots that fit that duration are proposed. Use list_appointment_types to see available types and durations.
 - Insurance verification (EDI 270/271)
 - Patient summaries for triage context
 - Clinical data review: allergies, medications, vitals, lab results, immunizations, procedures, encounters
@@ -185,6 +187,7 @@ def _build_staff_agent():
     tools = [
         get_current_datetime,
         get_clinic_info,
+        list_appointment_types,
         get_appointment_availability,
         get_staff_assigned_clinic,
         list_providers,

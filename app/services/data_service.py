@@ -5,6 +5,7 @@ import asyncio
 import os  # AI-generated
 from datetime import date, datetime
 
+from app.data.appointment_type_durations import get_duration_minutes
 from app.data.mock_data import (
     MOCK_APPOINTMENTS,
     MOCK_AVAILABLE_SLOTS,
@@ -93,6 +94,42 @@ def _fhir_slot_to_available_slot(resource: dict) -> dict:
         "duration": duration,
         "location": "",
         "type": "visit",
+    }
+
+
+def _fhir_appointment_to_available_slot(resource: dict, provider_map: dict[str, str]) -> dict:
+    """Transform FHIR Appointment (status=proposed = available slot) to mock available-slot shape."""
+    start = resource.get("start", "")
+    end = resource.get("end", "")
+    dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
+    date_str = dt.strftime("%Y-%m-%d") if dt else ""
+    time_str = (dt.strftime("%I:%M %p").lstrip("0") if dt else "")
+
+    duration = 30
+    if start and end:
+        try:
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            duration = int((end_dt - start_dt).total_seconds() / 60)
+        except (ValueError, TypeError):
+            pass
+
+    provider_id = ""
+    for p in resource.get("participant", []) or []:
+        ref = p.get("actor", {}).get("reference", "")
+        if "Practitioner/" in ref:
+            provider_id = ref.replace("Practitioner/", "")
+            break
+
+    return {
+        "id": resource.get("id", ""),
+        "date": date_str,
+        "time": time_str,
+        "providerId": provider_id,
+        "providerName": provider_map.get(provider_id, ""),
+        "duration": duration,
+        "location": "",
+        "type": resource.get("appointmentType", {}).get("text", "visit") or "visit",
     }
 
 
@@ -436,13 +473,58 @@ def get_available_dates() -> list[str]:
     return []
 
 
-def get_available_slots(date_str: str) -> list[dict]:
-    """Get available appointment slots for a date. date_str in YYYY-MM-DD. Only returns future slots."""
+def get_available_slots(
+    date_str: str,
+    appointment_type: str | None = None,
+) -> list[dict]:
+    """Get available appointment slots for a date. date_str in YYYY-MM-DD. Only returns future slots.
+    If appointment_type is provided, filters to slots with duration >= that type's default (OpenEMR).
+    FHIR: OpenEMR maps pc_apptstatus='-' (available) to Appointment status=proposed."""
     if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         matching = [s for s in MOCK_AVAILABLE_SLOTS if s["date"] == date_str]
-        return [s for s in matching if not _is_slot_in_past(s)]
-    # OpenEMR does not support FHIR Slot resources.
-    return []
+        matching = [s for s in matching if not _is_slot_in_past(s)]
+        if appointment_type:
+            required_min = get_duration_minutes(appointment_type)
+            matching = [s for s in matching if s.get("duration", 0) >= required_min]
+        return matching
+
+    async def _fetch():
+        # #region agent log
+        _log_path = "/Users/jackjiang/GitHub/openemr-system/.cursor/debug-3a6f31.log"
+        def _dbg(msg: str, d: dict):
+            import json
+            with open(_log_path, "a") as f:
+                f.write(json.dumps({"sessionId": "3a6f31", "location": "data_service.get_available_slots", "message": msg, "data": d, "timestamp": __import__("time").time() * 1000}) + "\n")
+        _dbg("FHIR path entered", {"date_str": date_str, "appointment_type": appointment_type, "hypothesisId": "E"})
+        # #endregion
+        client = get_fhir_client()
+        bundle = await client.get_appointments(
+            date_ge=date_str,
+            date_le=date_str,
+        )
+        entries = bundle.get("entry", []) or []
+        statuses = [e.get("resource", {}).get("status") for e in entries[:10]]
+        _dbg("FHIR bundle received", {"date_str": date_str, "entry_count": len(entries), "statuses_sample": statuses, "hypothesisId": "A"})
+        provider_map = {p["id"]: p["name"] for p in get_providers()}
+        slots = []
+        proposed_count = 0
+        for e in entries:
+            r = e.get("resource", {})
+            if r.get("resourceType") != "Appointment":
+                continue
+            if r.get("status") != "proposed":
+                continue
+            proposed_count += 1
+            slot = _fhir_appointment_to_available_slot(r, provider_map)
+            if not _is_slot_in_past(slot):
+                slots.append(slot)
+        _dbg("After filter proposed and past", {"proposed_count": proposed_count, "slots_count": len(slots), "hypothesisId": "B"})
+        if appointment_type:
+            required_min = get_duration_minutes(appointment_type)
+            slots = [s for s in slots if s.get("duration", 0) >= required_min]
+        return slots
+
+    return _run_async(_fetch())
 
 
 def get_patient_appointments(patient_id: str) -> list[dict]:

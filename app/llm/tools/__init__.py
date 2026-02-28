@@ -36,6 +36,7 @@ from app.llm.tools.scheduling_tools import (
     book_appointment,
     get_appointment_availability,
     get_patient_appointments,
+    list_appointment_types,
     list_upcoming_appointments,
 )
 
@@ -44,6 +45,7 @@ __all__ = [
     "get_current_datetime",
     # scheduling
     "get_appointment_availability",
+    "list_appointment_types",
     "get_patient_appointments",
     "list_upcoming_appointments",
     "book_appointment",

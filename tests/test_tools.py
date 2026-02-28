@@ -13,6 +13,7 @@ from app.llm.agent import (
     book_appointment,
     get_appointment_availability,
     get_clinic_info,
+    list_appointment_types,
     get_my_appointment_locations,
     get_patient_appointments,
     get_staff_assigned_clinic,
@@ -66,7 +67,24 @@ def test_get_clinic_info_nonexistent_returns_empty_providers():
     assert data["query_filter"] == "nonexistent"
 
 
-# --- Tool 2: get_appointment_availability ---
+# --- Tool 2: list_appointment_types ---
+
+
+def test_list_appointment_types_returns_types_and_durations():
+    result = list_appointment_types.invoke({})
+    data = _parse_tool_result(result)
+    assert "appointment_types" in data
+    types = data["appointment_types"]
+    assert len(types) > 0
+    new_patient = next((t for t in types if t["type"] == "new_patient"), None)
+    assert new_patient is not None
+    assert new_patient["duration_minutes"] == 30
+    office_visit = next((t for t in types if t["type"] == "office_visit"), None)
+    assert office_visit is not None
+    assert office_visit["duration_minutes"] == 15
+
+
+# --- Tool 3: get_appointment_availability ---
 
 
 def test_get_appointment_availability_date_with_slots_returns_matching_slots():
@@ -88,7 +106,23 @@ def test_get_appointment_availability_date_with_no_slots_returns_empty_and_avail
     assert "message" in data
 
 
-# --- Tool 3: list_providers ---
+def test_get_appointment_availability_with_new_patient_filters_short_slots():
+    """New patient = 30 min; 20-min slots should be excluded."""
+    result = get_appointment_availability.invoke({
+        "date": "2026-03-02",
+        "appointment_type": "new_patient",
+    })
+    data = _parse_tool_result(result)
+    assert data["date"] == "2026-03-02"
+    slots = data["slots"]
+    assert all(s["duration"] >= 30 for s in slots)
+    slot_ids = [s["id"] for s in slots]
+    assert "test-slot-003" not in slot_ids  # 20 min - too short
+    assert "test-slot-001" in slot_ids  # 30 min - fits
+    assert "test-slot-002" in slot_ids  # 45 min - fits
+
+
+# --- Tool 4: list_providers ---
 
 
 def test_list_providers_no_specialty_returns_all():

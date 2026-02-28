@@ -10,6 +10,7 @@ from app.services.data_service import (
     _fhir_practitioner_to_provider,
     _fhir_slot_to_available_slot,
     get_available_dates,
+    get_available_slots,
     get_providers,
 )
 from tests.fixtures.fhir_bundles import (
@@ -88,3 +89,12 @@ class TestDataServiceDispatch:
         dates = get_available_dates()
         assert len(dates) >= 0
         assert dates == sorted(dates)
+
+    def test_get_available_slots_filters_by_appointment_type_duration(self):
+        """When appointment_type=new_patient (30 min), slots with duration < 30 are excluded."""
+        slots_all = get_available_slots("2026-03-02")
+        slots_new_patient = get_available_slots("2026-03-02", appointment_type="new_patient")
+        assert len(slots_new_patient) <= len(slots_all)
+        assert all(s["duration"] >= 30 for s in slots_new_patient)
+        slot_ids = [s["id"] for s in slots_new_patient]
+        assert "test-slot-003" not in slot_ids  # 20 min - too short for new patient
