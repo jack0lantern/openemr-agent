@@ -9,8 +9,25 @@ from pathlib import Path
 
 import httpx
 import jwt
+import json
 
 logger = logging.getLogger(__name__)
+
+def _extract_json(text: str) -> dict:
+    """Parse JSON from response, ignoring any PHP notices/warnings before it."""
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find the start of the JSON object or array
+        start_idx = text.find("{")
+        arr_idx = text.find("[")
+        if start_idx == -1 or (arr_idx != -1 and arr_idx < start_idx):
+            start_idx = arr_idx
+            
+        if start_idx != -1:
+            return json.loads(text[start_idx:])
+        raise
 
 # All FHIR scopes for client credentials (system-level access)
 # OpenEMR 7.0.4 supports these V1 system scopes when rest_system_scopes_api is enabled
@@ -125,7 +142,7 @@ class FHIRClient:
             logger.exception("JWT signing failed")
             raise FHIRAuthError(f"JWT signing failed: {e}") from e
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 self._token_url,
                 data={
@@ -147,7 +164,17 @@ class FHIRClient:
                 f"Token request failed: {resp.status_code} - {resp.text[:200]}"
             )
 
-        data = resp.json()
+        try:
+            data = _extract_json(resp.text)
+        except Exception as e:
+            logger.error(
+                "Token response not JSON: status=%s body=%s",
+                resp.status_code,
+                resp.text[:500],
+            )
+            raise FHIRAuthError(
+                f"Token endpoint returned non-JSON (check OPENEMR_TOKEN_URL, OpenEMR reachability): {resp.text[:200]}"
+            ) from e
         self._access_token = data.get("access_token")
         expires_in = data.get("expires_in", 60)
         self._token_expires_at = now + expires_in
@@ -194,7 +221,11 @@ class FHIRClient:
                 f"FHIR {method} {path}: {resp.status_code} - {resp.text[:200]}"
             )
 
-        return resp.json()
+        try:
+            return _extract_json(resp.text)
+        except Exception:
+            # Fallback if somehow it's valid to not be JSON (rare in FHIR) or if parsing fails
+            return resp.json()
 
     async def get_practitioners(self, specialty: str | None = None) -> dict:
         """GET /fhir/Practitioner. Optional specialty filter."""
@@ -210,6 +241,10 @@ class FHIRClient:
     async def get_patient(self, patient_id: str) -> dict:
         """GET /fhir/Patient/{id}."""
         return await self._request("GET", f"Patient/{patient_id}")
+
+    async def get_appointment(self, appointment_id: str) -> dict:
+        """GET /fhir/Appointment/{id} for a single appointment."""
+        return await self._request("GET", f"Appointment/{appointment_id}")
 
     async def get_appointments(
         self,

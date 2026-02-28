@@ -93,7 +93,9 @@ def test_get_appointment_availability_date_with_slots_returns_matching_slots():
     assert data["date"] == "2026-03-02"
     assert len(data["slots"]) >= 3
     assert any(s["id"] == "test-slot-001" for s in data["slots"])
-    assert "8:00 AM" in [s["time"] for s in data["slots"]]
+    assert "8:00 AM" in [s["start_time"] for s in data["slots"]]
+    assert all("end_time" in s for s in data["slots"])
+    assert all("time_range" in s for s in data["slots"])
 
 
 def test_get_appointment_availability_date_with_no_slots_returns_empty_and_available_dates():
@@ -216,6 +218,43 @@ def test_book_appointment_valid_patient_valid_slot_returns_success():
     assert data["appointment"]["patientName"] == "Test Patient Alpha"
     assert data["appointment"]["date"] == "2026-03-02"
     assert data["appointment"]["time"] == "8:00 AM"
+
+
+def test_book_appointment_with_appointment_time_books_at_selected_increment():
+    """When user selects 9:45 AM within slot 9:30-10:15, books at 9:45 AM."""
+    result = book_appointment.invoke({
+        "patient_id": "test-pat-001",
+        "slot_id": "test-slot-002",
+        "appointment_time": "9:45 AM",
+    })
+    data = _parse_tool_result(result)
+    assert data["success"] is True
+    assert data["appointment"]["time"] == "9:45 AM"
+    assert data["appointment"]["date"] == "2026-03-02"
+
+
+def test_book_appointment_with_invalid_appointment_time_returns_error():
+    """When appointment_time is outside slot range, returns validation error."""
+    result = book_appointment.invoke({
+        "patient_id": "test-pat-001",
+        "slot_id": "test-slot-002",
+        "appointment_time": "10:30 AM",
+    })
+    data = _parse_tool_result(result)
+    assert data["success"] is False
+    assert "error" in data
+
+
+def test_book_appointment_with_colloquial_time_normalizes_correctly():
+    """Time formats like '10am' are normalized and accepted within slot range."""
+    result = book_appointment.invoke({
+        "patient_id": "test-pat-001",
+        "slot_id": "test-slot-002",
+        "appointment_time": "10am",
+    })
+    data = _parse_tool_result(result)
+    assert data["success"] is True
+    assert data["appointment"]["time"] == "10:00 AM"
 
 
 def test_book_appointment_valid_patient_invalid_slot_returns_error():

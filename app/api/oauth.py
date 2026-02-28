@@ -67,7 +67,12 @@ async def oauth_callback(
             status_code=resp.status_code,
         )
 
-    data = resp.json()
+    try:
+        from app.services.fhir_client import _extract_json
+        data = _extract_json(resp.text)
+    except Exception:
+        data = resp.json()
+
     patient_id = data.get("patient")
     redirect_path = "/patient" if patient_id else "/staff"
     redirect_url = f"{APP_BASE_URL.rstrip('/')}{redirect_path}"

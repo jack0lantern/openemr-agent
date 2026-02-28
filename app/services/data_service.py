@@ -3,7 +3,7 @@
 
 import asyncio
 import os  # AI-generated
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from app.data.appointment_type_durations import get_duration_minutes
 from app.data.mock_data import (
@@ -486,43 +486,45 @@ def get_available_slots(
         if appointment_type:
             required_min = get_duration_minutes(appointment_type)
             matching = [s for s in matching if s.get("duration", 0) >= required_min]
-        return matching
+        return _add_end_time_to_slots(matching)
 
     async def _fetch():
-        # #region agent log
-        _log_path = "/Users/jackjiang/GitHub/openemr-system/.cursor/debug-3a6f31.log"
-        def _dbg(msg: str, d: dict):
-            import json
-            with open(_log_path, "a") as f:
-                f.write(json.dumps({"sessionId": "3a6f31", "location": "data_service.get_available_slots", "message": msg, "data": d, "timestamp": __import__("time").time() * 1000}) + "\n")
-        _dbg("FHIR path entered", {"date_str": date_str, "appointment_type": appointment_type, "hypothesisId": "E"})
-        # #endregion
         client = get_fhir_client()
         bundle = await client.get_appointments(
             date_ge=date_str,
             date_le=date_str,
         )
         entries = bundle.get("entry", []) or []
-        statuses = [e.get("resource", {}).get("status") for e in entries[:10]]
-        _dbg("FHIR bundle received", {"date_str": date_str, "entry_count": len(entries), "statuses_sample": statuses, "hypothesisId": "A"})
-        provider_map = {p["id"]: p["name"] for p in get_providers()}
+        
+        # Need to fetch providers without nesting run_until_complete
+        # So we await it or fetch it synchronously if we are in async context
+        # But get_providers() is synchronous and uses _run_async. 
+        # Since we are already in an async function _fetch(), we can't call _run_async.
+        
+        # We fetch providers directly using the async fhir client
+        prov_bundle = await client.get_practitioners()
+        prov_entries = prov_bundle.get("entry", []) or []
+        provider_map = {
+            _fhir_practitioner_to_provider(e.get("resource", {})).get("id"): 
+            _fhir_practitioner_to_provider(e.get("resource", {})).get("name")
+            for e in prov_entries
+            if e.get("resource", {}).get("resourceType") == "Practitioner"
+        }
+        
         slots = []
-        proposed_count = 0
         for e in entries:
             r = e.get("resource", {})
             if r.get("resourceType") != "Appointment":
                 continue
             if r.get("status") != "proposed":
                 continue
-            proposed_count += 1
             slot = _fhir_appointment_to_available_slot(r, provider_map)
             if not _is_slot_in_past(slot):
                 slots.append(slot)
-        _dbg("After filter proposed and past", {"proposed_count": proposed_count, "slots_count": len(slots), "hypothesisId": "B"})
         if appointment_type:
             required_min = get_duration_minutes(appointment_type)
             slots = [s for s in slots if s.get("duration", 0) >= required_min]
-        return slots
+        return _add_end_time_to_slots(slots)
 
     return _run_async(_fetch())
 
@@ -559,6 +561,103 @@ def _time_sort_key(time_str: str) -> tuple[int, int]:
         return (parsed.hour, parsed.minute)
     except (ValueError, TypeError):
         return (0, 0)
+
+
+def _compute_end_time(time_str: str, duration_minutes: int) -> str:
+    """Add duration to time_str (e.g. '9:00 AM') and return formatted end time (e.g. '9:30 AM')."""
+    try:
+        dt_parsed = datetime.strptime(time_str.strip(), "%I:%M %p")
+        end_dt = dt_parsed + timedelta(minutes=duration_minutes)
+        return end_dt.strftime("%I:%M %p").lstrip("0")
+    except (ValueError, TypeError):
+        return ""
+
+
+def _add_end_time_to_slots(slots: list[dict]) -> list[dict]:
+    """Enrich each slot with end_time (start time + duration) for time-range display."""
+    return [
+        {**s, "end_time": _compute_end_time(s.get("time", ""), s.get("duration", 0))}
+        for s in slots
+    ]
+
+
+def _normalize_time_str(time_str: str) -> str:
+    """Normalize time strings like '12pm', '12:00 PM' to '12:00 PM' for parsing."""
+    s = time_str.strip()
+    if not s:
+        return ""
+    s_lower = s.lower()
+    if "am" in s_lower or "pm" in s_lower:
+        if ":" not in s:
+            hour_match = "".join(c for c in s if c.isdigit())
+            if hour_match:
+                hour = int(hour_match)
+                if "pm" in s_lower and hour < 12:
+                    hour += 12
+                elif "am" in s_lower and hour == 12:
+                    hour = 0
+                return f"{hour % 12 or 12}:00 {'PM' if 'pm' in s_lower else 'AM'}"
+        return s
+    return s
+
+
+def _parse_appointment_time_to_canonical(time_str: str) -> str | None:
+    """
+    Parse appointment_time (e.g. '12pm', '12:00 PM') to canonical 'H:MM AM/PM' format.
+    Returns None if unparseable.
+    """
+    normalized = _normalize_time_str(time_str)
+    if not normalized:
+        return None
+    for fmt in ("%I:%M %p", "%I %p", "%H:%M", "%H:%M:%S"):
+        try:
+            dt = datetime.strptime(normalized, fmt)
+            return dt.strftime("%I:%M %p").lstrip("0")
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _time_to_minutes_since_midnight(time_str: str) -> int | None:
+    """Parse '9:15 AM' or '12pm' to minutes since midnight. Returns None if unparseable."""
+    normalized = _normalize_time_str(time_str)
+    if not normalized:
+        return None
+    for fmt in ("%I:%M %p", "%I %p", "%H:%M", "%H:%M:%S"):
+        try:
+            dt = datetime.strptime(normalized, fmt)
+            return dt.hour * 60 + dt.minute
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _is_valid_appointment_time(
+    appointment_time: str,
+    slot: dict,
+    appointment_duration_minutes: int = 15,
+) -> tuple[bool, str | None]:
+    """
+    Validate that appointment_time is a 15-min increment within the slot and fits the duration.
+    Returns (valid, error_message). error_message is None when valid.
+    """
+    appt_min = _time_to_minutes_since_midnight(appointment_time)
+    if appt_min is None:
+        return False, f"Invalid time format: {appointment_time}. Use format like '9:15 AM'."
+    start_min = _time_to_minutes_since_midnight(slot.get("time", ""))
+    if start_min is None:
+        return False, "Slot has invalid start time."
+    end_min = _time_to_minutes_since_midnight(slot.get("end_time", ""))
+    if end_min is None:
+        end_min = start_min + slot.get("duration", 0)
+    if appt_min < start_min:
+        return False, f"{appointment_time} is before the slot start ({slot.get('time', '')})."
+    if appt_min + appointment_duration_minutes > end_min:
+        end_display = slot.get("end_time") or _compute_end_time(slot.get("time", ""), slot.get("duration", 0))
+        return False, f"{appointment_time} does not leave enough time for a {appointment_duration_minutes}-minute appointment before the slot ends at {end_display}."
+    if appt_min % 15 != 0:
+        return False, f"{appointment_time} must be a 15-minute increment (e.g. 9:00, 9:15, 9:30, 9:45)."
+    return True, None
 
 
 def _is_slot_in_past(slot: dict) -> bool:
@@ -600,11 +699,19 @@ def get_upcoming_appointments(today: str | None = None) -> list[dict]:
     return _run_async(_fetch())
 
 
-def book_appointment(patient_id: str, slot_id: str) -> dict:
+def book_appointment(
+    patient_id: str,
+    slot_id: str,
+    appointment_time: str | None = None,
+    appointment_type: str | None = None,
+) -> dict:
     """
     Book an appointment. Returns {success, appointment?, error?, suggestion?}.
     Mock: returns confirmation. FHIR: POSTs Appointment.
+    If appointment_time is provided, validates it is a 15-min increment within the slot and books at that time.
     """
+    appt_duration = get_duration_minutes(appointment_type) if appointment_type else 15
+
     if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
         slot = next((s for s in MOCK_AVAILABLE_SLOTS if s["id"] == slot_id), None)
         if not slot:
@@ -613,6 +720,29 @@ def book_appointment(patient_id: str, slot_id: str) -> dict:
                 "error": f"Slot {slot_id} not found",
                 "suggestion": "Use get_appointment_availability to see available slots",
             }
+        slot = {
+            **slot,
+            "end_time": slot.get("end_time")
+            or _compute_end_time(slot.get("time", ""), slot.get("duration", 0)),
+        }
+        if appointment_time:
+            canonical_time = _parse_appointment_time_to_canonical(appointment_time)
+            if not canonical_time:
+                return {
+                    "success": False,
+                    "error": f"Invalid time format: {appointment_time}. Use format like '12:00 PM' or '12pm'.",
+                    "suggestion": "Use get_appointment_availability to see available time ranges.",
+                }
+            valid, err = _is_valid_appointment_time(
+                canonical_time, slot, appt_duration
+            )
+            if not valid:
+                return {
+                    "success": False,
+                    "error": err,
+                    "suggestion": "Use get_appointment_availability to see available time ranges.",
+                }
+            slot = {**slot, "time": canonical_time, "duration": appt_duration}
         if _is_slot_in_past(slot):
             return {
                 "success": False,
@@ -639,15 +769,60 @@ def book_appointment(patient_id: str, slot_id: str) -> dict:
     async def _book():
         client = get_fhir_client()
         try:
-            # Build minimal FHIR Appointment
+            # slot_id is the ID of a proposed Appointment resource (OpenEMR exposes
+            # available slots as Appointment?status=proposed, not as FHIR Slot resources).
             appointment = {
                 "resourceType": "Appointment",
                 "status": "booked",
                 "participant": [
                     {"actor": {"reference": f"Patient/{patient_id}"}, "required": "required"},
-                    {"actor": {"reference": f"Slot/{slot_id}"}, "required": "required"},
+                    {"actor": {"reference": f"Appointment/{slot_id}"}, "required": "required"},
                 ],
             }
+            if appointment_time:
+                canonical_time = _parse_appointment_time_to_canonical(appointment_time)
+                if not canonical_time:
+                    return {
+                        "success": False,
+                        "error": f"Invalid time format: {appointment_time}. Use format like '12:00 PM' or '12pm'.",
+                        "suggestion": "Use get_appointment_availability to see available time ranges.",
+                    }
+                slot_res = await client.get_appointment(slot_id)
+                slot_start = slot_res.get("start", "")
+                if not slot_start:
+                    return {
+                        "success": False,
+                        "error": f"Could not load slot {slot_id} to validate appointment time.",
+                    }
+                slot_dt = datetime.fromisoformat(slot_start.replace("Z", "+00:00"))
+                slot_date_str = slot_dt.strftime("%Y-%m-%d")
+                slot_time_str = slot_dt.strftime("%I:%M %p").lstrip("0")
+                slot_end = slot_res.get("end", "")
+                if slot_end:
+                    end_dt = datetime.fromisoformat(slot_end.replace("Z", "+00:00"))
+                    slot_end_time = end_dt.strftime("%I:%M %p").lstrip("0")
+                else:
+                    slot_end_time = _compute_end_time(slot_time_str, 30)
+                slot_slot = {
+                    "time": slot_time_str,
+                    "end_time": slot_end_time,
+                    "date": slot_date_str,
+                }
+                valid, err = _is_valid_appointment_time(
+                    canonical_time, slot_slot, appt_duration
+                )
+                if not valid:
+                    return {
+                        "success": False,
+                        "error": err,
+                        "suggestion": "Use get_appointment_availability to see available time ranges.",
+                    }
+                appt_dt = datetime.strptime(
+                    f"{slot_date_str} {canonical_time}",
+                    "%Y-%m-%d %I:%M %p",
+                )
+                appointment["start"] = appt_dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+                appointment["minutesDuration"] = appt_duration
             created = await client.create_appointment(appointment)
             start = created.get("start", "")
             dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
