@@ -771,14 +771,43 @@ def book_appointment(
         try:
             # slot_id is the ID of a proposed Appointment resource (OpenEMR exposes
             # available slots as Appointment?status=proposed, not as FHIR Slot resources).
-            appointment = {
-                "resourceType": "Appointment",
-                "status": "booked",
-                "participant": [
-                    {"actor": {"reference": f"Patient/{patient_id}"}, "required": "required"},
-                    {"actor": {"reference": f"Appointment/{slot_id}"}, "required": "required"},
-                ],
-            }
+            # Fetch the slot to get Practitioner, Location, start, and duration.
+            slot_res = await client.get_appointment(slot_id)
+            slot_start = slot_res.get("start", "")
+            if not slot_start:
+                return {
+                    "success": False,
+                    "error": f"Could not load slot {slot_id}. Slot may be invalid or no longer available.",
+                }
+            slot_dt = datetime.fromisoformat(slot_start.replace("Z", "+00:00"))
+            slot_date_str = slot_dt.strftime("%Y-%m-%d")
+            slot_time_str = slot_dt.strftime("%I:%M %p").lstrip("0")
+            slot_end = slot_res.get("end", "")
+            if slot_end:
+                end_dt = datetime.fromisoformat(slot_end.replace("Z", "+00:00"))
+                slot_end_time = end_dt.strftime("%I:%M %p").lstrip("0")
+            else:
+                slot_duration = slot_res.get("minutesDuration", 30)
+                slot_end_time = _compute_end_time(slot_time_str, slot_duration)
+
+
+            # Build participants from slot: Patient (required), Practitioner (from slot), Location (optional).
+            # FHIR R4: Appointment participants must be Patient, Practitioner, Person, Location, etc.
+            # Do NOT use Appointment/{slot_id} as a participant — that is invalid.
+            participants = [
+                {"actor": {"reference": f"Patient/{patient_id}"}, "required": "required"},
+            ]
+            for p in slot_res.get("participant", []) or []:
+                ref = p.get("actor", {}).get("reference", "")
+                if ref and ("Practitioner/" in ref or "Person/" in ref):
+                    participants.append({"actor": {"reference": ref}, "required": "required"})
+                    break
+            for p in slot_res.get("participant", []) or []:
+                ref = p.get("actor", {}).get("reference", "")
+                if ref and "Location/" in ref:
+                    participants.append({"actor": {"reference": ref}, "required": "optional"})
+                    break
+
             if appointment_time:
                 canonical_time = _parse_appointment_time_to_canonical(appointment_time)
                 if not canonical_time:
@@ -787,22 +816,6 @@ def book_appointment(
                         "error": f"Invalid time format: {appointment_time}. Use format like '12:00 PM' or '12pm'.",
                         "suggestion": "Use get_appointment_availability to see available time ranges.",
                     }
-                slot_res = await client.get_appointment(slot_id)
-                slot_start = slot_res.get("start", "")
-                if not slot_start:
-                    return {
-                        "success": False,
-                        "error": f"Could not load slot {slot_id} to validate appointment time.",
-                    }
-                slot_dt = datetime.fromisoformat(slot_start.replace("Z", "+00:00"))
-                slot_date_str = slot_dt.strftime("%Y-%m-%d")
-                slot_time_str = slot_dt.strftime("%I:%M %p").lstrip("0")
-                slot_end = slot_res.get("end", "")
-                if slot_end:
-                    end_dt = datetime.fromisoformat(slot_end.replace("Z", "+00:00"))
-                    slot_end_time = end_dt.strftime("%I:%M %p").lstrip("0")
-                else:
-                    slot_end_time = _compute_end_time(slot_time_str, 30)
                 slot_slot = {
                     "time": slot_time_str,
                     "end_time": slot_end_time,
@@ -821,8 +834,26 @@ def book_appointment(
                     f"{slot_date_str} {canonical_time}",
                     "%Y-%m-%d %I:%M %p",
                 )
-                appointment["start"] = appt_dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-                appointment["minutesDuration"] = appt_duration
+                start_iso = appt_dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+                minutes_duration = appt_duration
+            else:
+                start_iso = slot_start
+                minutes_duration = slot_res.get("minutesDuration", 30)
+                if slot_end and slot_start:
+                    try:
+                        start_dt = datetime.fromisoformat(slot_start.replace("Z", "+00:00"))
+                        end_dt = datetime.fromisoformat(slot_end.replace("Z", "+00:00"))
+                        minutes_duration = int((end_dt - start_dt).total_seconds() / 60)
+                    except (ValueError, TypeError):
+                        pass
+
+            appointment = {
+                "resourceType": "Appointment",
+                "status": "booked",
+                "participant": participants,
+                "start": start_iso,
+                "minutesDuration": minutes_duration,
+            }
             created = await client.create_appointment(appointment)
             start = created.get("start", "")
             dt = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else None
