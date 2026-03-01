@@ -1044,8 +1044,8 @@ def verify_insurance(member_id: str) -> dict:
 
 
 def search_conditions(symptoms: str) -> list[dict]:
-    """Search conditions by symptoms. Keeps mock for educational content per prompt."""
-    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":  # AI-generated
+    """Search conditions by symptoms. Mock or MedlinePlus Connect + symptom→ICD mapping."""
+    if os.getenv("USE_MOCK_DATA", "false").lower() == "true":
         query = (symptoms or "").lower().strip()
         if not query:
             return []
@@ -1068,25 +1068,55 @@ def search_conditions(symptoms: str) -> list[dict]:
                 })
         return matches
 
-    async def _fetch():
-        client = get_fhir_client()
-        bundle = await client.get_conditions(code_text=symptoms if symptoms else None)
-        entries = bundle.get("entry", []) or []
-        result = []
-        for e in entries:
-            if e.get("resource", {}).get("resourceType") != "Condition":
-                continue
-            name = _fhir_condition_to_condition(e.get("resource", {}))["name"]
-            result.append({
-                "name": name,
-                "description": "",
-                "common_symptoms": [],
-                "match_score": 1.0,
-                "url": _CONDITION_URLS.get(name),
-            })
-        return result
+    # Non-mock: MedlinePlus Connect + symptom→ICD mapping
+    from app.data.symptom_icd_mapping import get_icd_codes_for_symptoms
+    from app.services.external_data.medlineplus_client import get_condition_info
 
-    return _run_async(_fetch())
+    _cache = getattr(search_conditions, "_medlineplus_cache", None)
+    if _cache is None:
+        try:
+            from cachetools import TTLCache
+            ttl_min = int(os.getenv("EXTERNAL_DATA_CACHE_TTL_MINUTES", "720"))
+            search_conditions._medlineplus_cache = TTLCache(maxsize=500, ttl=ttl_min * 60)
+        except ImportError:
+            search_conditions._medlineplus_cache = {}
+
+    query = (symptoms or "").strip()
+    if not query:
+        return []
+    icd_codes = get_icd_codes_for_symptoms(query)
+    if not icd_codes:
+        return []
+
+    seen_urls: set[str] = set()
+    result: list[dict] = []
+    for icd in icd_codes[:5]:  # Limit to 5 ICD codes
+        cache_key = f"cond:{icd}"
+        cached = search_conditions._medlineplus_cache.get(cache_key)
+        if cached is not None:
+            entries = cached
+        else:
+            entries = get_condition_info(icd)
+            try:
+                search_conditions._medlineplus_cache[cache_key] = entries
+            except (TypeError, AttributeError):
+                pass
+        for entry in entries:
+            url = entry.get("url") or ""
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+            result.append({
+                "name": entry.get("title", "Condition"),
+                "description": entry.get("summary", ""),
+                "common_symptoms": [],
+                "match_score": 0.8,
+                "url": url or None,
+            })
+        if len(result) >= 5:
+            break
+    return result[:5]
 
 
 
@@ -1133,9 +1163,55 @@ def search_pharmaceuticals(query: str) -> list[dict]:
             out.append(item)
         return out
     
-    # In a real implementation, this would query an external drug database or FHIR MedicationKnowledge
-    # For now, we just return empty if not using mock data
-    return []
+    # Non-mock: RxNav + MedlinePlus Connect
+    from app.services.external_data.medlineplus_client import get_drug_info
+    from app.services.external_data.rxnav_client import find_rxcui
+
+    _cache = getattr(search_pharmaceuticals, "_pharma_cache", None)
+    if _cache is None:
+        try:
+            from cachetools import TTLCache
+            ttl_min = int(os.getenv("EXTERNAL_DATA_CACHE_TTL_MINUTES", "720"))
+            search_pharmaceuticals._pharma_cache = TTLCache(maxsize=500, ttl=ttl_min * 60)
+        except ImportError:
+            search_pharmaceuticals._pharma_cache = {}
+
+    q = (query or "").strip()
+    if not q:
+        return []
+    # Extract drug name: take first word or "warfarin" from "warfarin what meds interact"
+    drug_name = q.split()[0] if q.split() else q
+    if len(drug_name) < 2:
+        return []
+
+    cache_key = f"rx:{drug_name.lower()}"
+    cached = search_pharmaceuticals._pharma_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    rxcui = find_rxcui(drug_name)
+    if not rxcui:
+        return []
+
+    entries = get_drug_info(rxcui)
+    out: list[dict] = []
+    for entry in entries[:3]:  # Limit to 3 drug entries
+        url = entry.get("url")
+        desc = entry.get("summary", "")
+        if "interact" in q.lower():
+            desc = desc + " Many medications and supplements can interact; see full details at the link below."
+        out.append({
+            "name": entry.get("title", "Medication"),
+            "description": desc,
+            "common_uses": [],
+            "url": url,
+            "match_score": 0.9,
+        })
+    try:
+        search_pharmaceuticals._pharma_cache[cache_key] = out
+    except (TypeError, AttributeError):
+        pass
+    return out
 
 def get_clinic_info(query: str = "") -> dict:
     """Get clinic info and optionally filtered providers."""

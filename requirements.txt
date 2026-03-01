@@ -19,6 +19,9 @@ asyncpg>=0.29.0
 aiosqlite>=0.20.0
 alembic>=1.13.0
 
+# External data caching (MedlinePlus, RxNav)
+cachetools>=5.3.0
+
 # Telemetry (PRD §6.2 - Datadog/CloudWatch compatible)
 opentelemetry-api>=1.27.0
 opentelemetry-sdk>=1.27.0
