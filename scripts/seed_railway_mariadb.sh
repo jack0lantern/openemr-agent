@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Seed the Railway MariaDB with FHIR data from seed_fhir_data.sql
 #
-# Method: SSH into the OpenEMR service (which has network access to mariadb.railway.internal)
-# and pipe the SQL through the mysql client.
+# Method: SSH into the OpenEMR service (which has network access to mariadb.railway.internal),
+# write the SQL to a temp file on the remote, then execute it. (Piping stdin fails due to TTY.)
 #
 # Prerequisites:
 #   - railway login
@@ -21,8 +21,9 @@ if [[ ! -f "$SEED_SQL" ]]; then
   exit 1
 fi
 
-echo "Piping seed SQL into Railway MariaDB via OpenEMR SSH..."
-if base64 -i "$SEED_SQL" 2>/dev/null | railway ssh -s openemr 'base64 -d | mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE -A'; then
+echo "Seeding Railway MariaDB via OpenEMR SSH..."
+SEED_B64=$(base64 -i "$SEED_SQL" 2>/dev/null || base64 < "$SEED_SQL")
+if railway ssh -s openemr "echo '$SEED_B64' | base64 -d > /tmp/seed.sql && mysql -h \$MYSQL_HOST -u \$MYSQL_USER -p\$MYSQL_PASSWORD \$MYSQL_DATABASE -A < /tmp/seed.sql && rm /tmp/seed.sql && echo Done"; then
   echo "Seed completed successfully."
 else
   echo "Seed failed or OpenEMR service may be sleeping. Try:"
