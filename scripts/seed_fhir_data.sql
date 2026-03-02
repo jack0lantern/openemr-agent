@@ -14,6 +14,12 @@
 --        (-T disables TTY; required when piping input)
 
 -- =============================================================================
+-- 0. GLOBALS / CONFIG - Time zone (UTC-6: America/Regina, no DST)
+-- =============================================================================
+INSERT INTO `globals` (`gl_name`, `gl_index`, `gl_value`) VALUES ('gbl_time_zone', 0, 'America/Regina')
+ON DUPLICATE KEY UPDATE `gl_value` = VALUES(`gl_value`);
+
+-- =============================================================================
 -- 1. ORGANIZATION (facility) - GET /fhir/Organization
 -- =============================================================================
 SET @facility_uuid = UNHEX(REPLACE('b2c3d4e5-f6a7-4890-b123-456789abcdef', '-', ''));

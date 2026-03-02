@@ -6,6 +6,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 
+from app.config import app_timezone
 from app.data.appointment_type_durations import get_duration_minutes
 from app.data.mock_data import (
     MOCK_APPOINTMENTS,
@@ -550,7 +551,7 @@ def get_patient_appointments(patient_id: str) -> list[dict]:
 
 def _today() -> date:
     """Injected for tests; override to control date-sensitive logic."""
-    return date.today()
+    return datetime.now(app_timezone()).date()
 
 
 def _time_sort_key(time_str: str) -> tuple[int, int]:
@@ -668,7 +669,8 @@ def _is_slot_in_past(slot: dict) -> bool:
             f"{slot.get('date', '')} {slot.get('time', '')}",
             "%Y-%m-%d %I:%M %p",
         )
-        return slot_dt <= datetime.now()
+        slot_dt = slot_dt.replace(tzinfo=app_timezone())
+        return slot_dt <= datetime.now(app_timezone())
     except (ValueError, TypeError):
         return True  # Treat unparseable as past to be safe
 

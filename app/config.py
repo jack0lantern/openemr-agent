@@ -4,6 +4,13 @@ Read at access time so tests can monkeypatch env before importing/running.
 """
 
 import os
+from datetime import timedelta, timezone
+
+
+def app_timezone() -> timezone:
+    """Default timezone for the agent (e.g. clinic local time). UTC-6 by default."""
+    offset = int(os.getenv("TIMEZONE_OFFSET_HOURS", "-6"))
+    return timezone(timedelta(hours=offset))
 
 
 def openemr_token_url() -> str:

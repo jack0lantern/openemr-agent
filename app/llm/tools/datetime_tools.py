@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 from langchain_core.tools import tool
 
+from app.config import app_timezone
 from app.llm.tools._utils import _tool_result
 
 
@@ -23,7 +24,7 @@ def get_current_datetime(offset_days: int = 0) -> str:
         offset_days: Days to add (positive) or subtract (negative) from today.
                      Use 0 for the current date, 1 for tomorrow, 7 for a week from now, -1 for yesterday, etc.
     """
-    now = datetime.now()
+    now = datetime.now(app_timezone())
     today = now.date()
     target = today + timedelta(days=offset_days)
 
