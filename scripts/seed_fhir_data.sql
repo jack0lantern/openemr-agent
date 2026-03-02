@@ -29,7 +29,7 @@ UPDATE `facility` SET
   `country_code` = 'US',
   `email` = 'info@riversidemed.org',
   `uuid` = @facility_uuid,
-  `info` = 'Hours: Tue–Sat 7am–6pm. Parking: Garage on Level P1, validation at front desk.',
+  `info` = 'Clinic hours: Tue–Sat 7:00am–6:00pm. Closed Sun–Mon. Parking: Garage on Level P1, validation at front desk.',
   `primary_business_entity` = 1
 WHERE `id` = 3;
 
@@ -47,7 +47,7 @@ INSERT INTO `facility` (
   4, @facility2_uuid, 'Downtown Clinic', '(503) 777-0200', '(503) 777-0201',
   '200 Commerce St, Suite 100', 'Portland', 'OR', '97205', 'US',
   1, 1, 1, '#99CCFF', 0, 1, 0,
-  'Hours: Mon–Fri 8am–5pm. Street parking and nearby garage.'
+  'Clinic hours: Mon–Fri 8:00am–5:00pm. Closed weekends. Street parking and nearby garage.'
 ) ON DUPLICATE KEY UPDATE
   `name` = VALUES(`name`),
   `phone` = VALUES(`phone`),

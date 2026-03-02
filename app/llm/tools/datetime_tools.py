@@ -13,7 +13,7 @@ def get_current_datetime(offset_days: int = 0) -> str:
 
     Always call this tool FIRST when:
     - The user interacts with appointments (checking availability, booking, listing).
-      This ensures only future appointments can be booked.
+      Assume users want to book into the future; this tool establishes the current date so only future slots are proposed.
     - The user mentions any relative time expression such as 'today', 'tomorrow',
       'next week', 'next month', 'in two weeks', etc.
 

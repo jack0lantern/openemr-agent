@@ -1224,12 +1224,14 @@ def get_clinic_info(query: str = "") -> dict:
             ]
         else:
             providers = MOCK_PROVIDERS
+        # Use primary facility from seed data for clinic info (address, hours, parking, phone)
+        primary = MOCK_FACILITIES[0] if MOCK_FACILITIES else {}
         return {
             "clinic": {
-                "address": "123 Healthcare Ave, Suite 100",
-                "hours": "Mon–Fri 8am–5pm",
-                "parking": "Free parking in the lot behind the building",
-                "phone": "555-0199",
+                "address": primary.get("address", "123 Healthcare Ave, Suite 100"),
+                "hours": primary.get("hours", "Mon–Fri 8am–5pm"),
+                "parking": primary.get("parking", "Free parking in the lot behind the building"),
+                "phone": primary.get("phone", "555-0199"),
             },
             "providers": [
                 {"id": p["id"], "name": p["name"], "specialty": p["specialty"], "phone": p["phone"], "email": p["email"]}

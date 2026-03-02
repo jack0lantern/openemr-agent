@@ -238,6 +238,7 @@ MOCK_STAFF = [
 ]
 
 # Facilities/clinics (OpenEMR facility table)
+# hours: human-readable summary; hoursOfOperation: structured day-by-day for tools
 MOCK_FACILITIES = [
     {
         "id": "fac-001",
@@ -247,7 +248,16 @@ MOCK_FACILITIES = [
         "state": "IL",
         "postal_code": "62701",
         "phone": "555-0199",
-        "hours": "Mon–Fri 8am–5pm",
+        "hours": "Mon–Fri 8am–5pm, Sat 9am–1pm",
+        "hoursOfOperation": [
+            {"days": "mon", "open": "08:00", "close": "17:00"},
+            {"days": "tue", "open": "08:00", "close": "17:00"},
+            {"days": "wed", "open": "08:00", "close": "17:00"},
+            {"days": "thu", "open": "08:00", "close": "17:00"},
+            {"days": "fri", "open": "08:00", "close": "17:00"},
+            {"days": "sat", "open": "09:00", "close": "13:00"},
+        ],
+        "parking": "Free parking in the lot behind the building",
     },
     {
         "id": "fac-002",
@@ -257,7 +267,15 @@ MOCK_FACILITIES = [
         "state": "IL",
         "postal_code": "62702",
         "phone": "555-0200",
-        "hours": "Mon–Thu 9am–6pm",
+        "hours": "Mon–Thu 9am–6pm, Fri 9am–2pm",
+        "hoursOfOperation": [
+            {"days": "mon", "open": "09:00", "close": "18:00"},
+            {"days": "tue", "open": "09:00", "close": "18:00"},
+            {"days": "wed", "open": "09:00", "close": "18:00"},
+            {"days": "thu", "open": "09:00", "close": "18:00"},
+            {"days": "fri", "open": "09:00", "close": "14:00"},
+        ],
+        "parking": "Street parking and nearby garage",
     },
 ]
 
