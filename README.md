@@ -2,6 +2,25 @@
 
 FastAPI microservice providing patient and staff chat APIs per the [PRD](../PRD.md).
 
+## OAuth2 Registration
+
+The agent uses OAuth2 `client_credentials` with `private_key_jwt` (RS384). You can register manually or use the automated flow.
+
+### One-time registration (recommended)
+
+```bash
+# Ensure OpenEMR is running (e.g. docker-compose up)
+# Set OPENEMR_TOKEN_URL in .env for your environment (see .env.example)
+python scripts/register_agent.py --output-env
+# Add the printed OPENEMR_CLIENT_ID=... to your .env
+```
+
+### Auto-registration on startup
+
+Set `OPENEMR_AUTO_REGISTER=true` and leave `OPENEMR_CLIENT_ID` empty. On first startup, the agent will generate keys (if missing), register with OpenEMR, and persist `client_id` to `.agent-registration`.
+
+**Required after registration:** Enable the client in **Administration → System → API Clients** in OpenEMR. System-scope clients require manual approval.
+
 ## APIs
 
 | Endpoint | Audience | Use Cases |
